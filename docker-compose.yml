@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  sap-gui-flow-frontend:
+    build: .
+    container_name: sap-gui-flow-ui
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    networks:
+      - sap-gui-flow-network
+
+networks:
+  sap-gui-flow-network:
+    driver: bridge 

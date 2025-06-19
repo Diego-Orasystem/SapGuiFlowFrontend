@@ -1,0 +1,63 @@
+<div class="container-fluid py-3">
+  <div class="row">
+    <div class="col-md-12 mb-4">
+      <h1 class="display-6 mb-3">Editor de Flujo SAP GUI</h1>
+      <p class="lead">Herramienta para visualizar y editar flujos de automatización de SAP GUI</p>
+    </div>
+  </div>
+  
+  <!-- Sección de carga de archivos (acordeón) -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white" (click)="toggleFileUploadSection()" style="cursor: pointer;">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center">
+              <i class="bi bi-cloud-upload fs-4 text-primary me-2"></i>
+              <h5 class="card-title mb-0">Cargar Archivos</h5>
+            </div>
+            <i class="bi" [ngClass]="isFileUploadSectionOpen ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+          </div>
+        </div>
+        <div class="card-body" [ngClass]="{'d-none': !isFileUploadSectionOpen}">
+          <div class="row g-3">
+            <div class="col-lg-6">
+              <app-file-upload></app-file-upload>
+            </div>
+            <div class="col-lg-6">
+              <app-file-preview></app-file-preview>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="row">
+    <div class="col-md-12">
+      <app-flow-editor [jsonContent]="sapFlowJson"></app-flow-editor>
+    </div>
+  </div>
+  
+  <!-- Herramientas de exportación -->
+  <div class="row mt-4">
+    <div class="col-md-12">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white">
+          <div class="d-flex align-items-center">
+            <i class="bi bi-download fs-4 text-primary me-2"></i>
+            <h5 class="card-title mb-0">Exportar Flujos</h5>
+          </div>
+        </div>
+        <div class="card-body">
+          <app-export-tools></app-export-tools>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <footer class="mt-5 pt-4 border-top text-center text-muted">
+    <p class="small mb-1">SAP GUI Flow - Versión 1.0</p>
+    <p class="small mb-0">© 2025 - Procesador de Flujos SAP</p>
+  </footer>
+</div> 

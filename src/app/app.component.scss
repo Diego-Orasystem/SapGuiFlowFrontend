@@ -1,0 +1,57 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+header {
+  h1 {
+    font-weight: 500;
+    color: #eaeaea;
+    
+    i {
+      color: var(--bs-primary);
+    }
+  }
+}
+
+.container-fluid {
+  max-width: 1400px;
+}
+
+.main-content {
+  min-height: calc(100vh - 200px);
+}
+
+footer {
+  color: #aaaaaa;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  
+  p {
+    margin-bottom: 0.25rem;
+  }
+}
+
+// Estilos adicionales para la interfaz
+.card {
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  }
+}
+
+// Mejoras para los botones
+.btn {
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+// Efectos de hover para elementos interactivos
+.hover-effect {
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+  }
+} 

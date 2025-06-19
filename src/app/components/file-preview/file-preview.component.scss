@@ -1,0 +1,241 @@
+.preview-container {
+  background-color: white;
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  padding: 20px;
+  margin-bottom: 20px;
+  
+  h2 {
+    margin-bottom: 15px;
+    color: var(--dark-gray);
+  }
+}
+
+.preview-content {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 20px;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.file-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border-radius: 0.25rem;
+  
+  .list-group-item {
+    border-left: 3px solid transparent;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      background-color: rgba(13, 110, 253, 0.05);
+    }
+    
+    &.active {
+      border-left: 3px solid #0d6efd;
+      background-color: #2c3e50;
+      color: #ffffff;
+      
+      .text-muted {
+        color: rgba(255, 255, 255, 0.7) !important;
+      }
+    }
+  }
+}
+
+.file-preview {
+  border: 1px solid var(--gray);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  
+  .preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background-color: var(--light-gray);
+    border-bottom: 1px solid var(--gray);
+  }
+  
+  .preview-body {
+    background-color: white;
+    padding: 0;
+    height: 500px;
+    overflow: auto;
+    
+    pre {
+      margin: 0;
+      padding: 15px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+  }
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  text-align: center;
+  color: var(--dark-gray);
+  
+  p {
+    margin-bottom: 10px;
+  }
+}
+
+// Modal de edición
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+  
+  &.show {
+    display: block;
+  }
+  
+  .modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+  
+  .modal-content {
+    position: relative;
+    width: 90%;
+    max-width: 800px;
+    margin: 50px auto;
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background-color: var(--light-gray);
+    border-bottom: 1px solid var(--gray);
+    
+    h3 {
+      margin: 0;
+    }
+    
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: var(--dark-gray);
+      
+      &:hover {
+        color: var(--danger);
+      }
+    }
+  }
+  
+  .modal-body {
+    padding: 0;
+  }
+  
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 15px 20px;
+    background-color: var(--light-gray);
+    border-top: 1px solid var(--gray);
+  }
+}
+
+// Estilos para la previsualización de contenido
+.file-content-preview {
+  border: 1px solid #dee2e6;
+  border-top: none;
+  border-radius: 0 0 0.25rem 0.25rem;
+  max-height: 250px;
+  overflow-y: auto;
+  
+  pre {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+}
+
+// Estilos para el editor JSON en el modal
+.json-editor-container {
+  position: relative;
+  height: 100%;
+  
+  .json-editor {
+    width: 100%;
+    height: 100%;
+    min-height: 300px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    padding: 1rem;
+    border: none;
+    border-radius: 0;
+    resize: none;
+    color: #ffffff;
+    background-color: #2c3e50;
+    
+    &:focus {
+      outline: none;
+      box-shadow: none;
+      background-color: #34495e;
+    }
+  }
+}
+
+// Mejoras de accesibilidad y legibilidad
+.fw-medium {
+  font-weight: 500;
+}
+
+.text-primary {
+  color: #0d6efd !important;
+}
+
+// Estilo para el botón de cerrar en la vista previa
+.btn-outline-light {
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+// Estilos para el modal
+.modal-header.bg-dark {
+  border-bottom: 1px solid #343a40;
+}
+
+.modal-body {
+  padding: 0 !important;
+  background-color: #2c3e50;
+}
+
+.modal-footer {
+  border-top: 1px solid #4a5568;
+  background-color: #2c3e50;
+} 

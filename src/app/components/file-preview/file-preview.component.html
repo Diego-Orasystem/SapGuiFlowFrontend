@@ -1,0 +1,133 @@
+<div class="card shadow-sm h-100 border-0">
+  <div class="card-body p-3">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h6 class="mb-0 fw-bold">Archivos Procesados</h6>
+      <div>
+        <button class="btn btn-sm btn-outline-primary" *ngIf="selectedFile" (click)="togglePreview()">
+          <i class="bi" [ngClass]="showPreview ? 'bi-eye-slash' : 'bi-eye'"></i>
+          {{ showPreview ? 'Ocultar' : 'Ver' }}
+        </button>
+      </div>
+    </div>
+    
+    <div *ngIf="!showPreview">
+      <div *ngIf="files.length === 0" class="text-center p-3 bg-light rounded">
+        <i class="bi bi-inbox fs-3 text-secondary mb-2"></i>
+        <p class="mb-0 text-muted small">No hay archivos procesados disponibles</p>
+      </div>
+      
+      <div *ngIf="files.length > 0" class="file-list-container">
+        <div class="list-group list-group-sm file-list">
+          <a href="javascript:void(0)" 
+             *ngFor="let file of files" 
+             class="list-group-item list-group-item-action py-2" 
+             [ngClass]="{'active': isSelected(file)}"
+             (click)="selectFile(file)">
+            
+            <div class="d-flex align-items-center">
+              <div class="me-2">
+                <i class="bi bi-file-earmark-text" [class.text-white]="isSelected(file)"></i>
+              </div>
+              <div class="flex-grow-1">
+                <div class="fw-medium" [class.text-white]="isSelected(file)">{{file.name}}</div>
+                <div class="d-flex justify-content-between small text-muted">
+                  <span>{{file.size | number}} bytes</span>
+                  <span>{{file.modified | date:'short'}}</span>
+                </div>
+              </div>
+              <div class="ms-2" *ngIf="isSelected(file)">
+                <i class="bi bi-check-circle-fill text-success"></i>
+              </div>
+            </div>
+          </a>
+        </div>
+        
+        <div class="mt-2 d-flex justify-content-center" *ngIf="selectedFile">
+          <button class="btn btn-sm btn-outline-primary me-1" (click)="openJsonModal()" title="Ver y editar JSON">
+            <i class="bi bi-code-square"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-secondary me-1" (click)="processFile()" title="Procesar archivo">
+            <i class="bi bi-gear"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" (click)="downloadFile()" title="Descargar archivo">
+            <i class="bi bi-download"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Vista previa del contenido del archivo -->
+    <div class="p-0" *ngIf="showPreview && selectedFile">
+      <div class="bg-dark text-light p-2 d-flex align-items-center justify-content-between rounded-top">
+        <div>
+          <i class="bi bi-file-earmark-code me-2"></i>
+          <span class="fw-medium small text-white">{{selectedFile.name}}</span>
+        </div>
+        <button class="btn btn-sm btn-outline-light py-0 px-2" (click)="togglePreview()">
+          <i class="bi bi-x"></i>
+        </button>
+      </div>
+      
+      <div class="file-content-preview" style="max-height: 200px; overflow-y: auto;">
+        <pre class="language-json m-0 p-2 small text-white"><code class="text-white">{{getFormattedContent()}}</code></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
+
+<!-- Modal para ver y editar JSON -->
+<div class="modal fade" id="jsonEditorModal" tabindex="-1" aria-labelledby="jsonEditorModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content bg-dark">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title" id="jsonEditorModalLabel" *ngIf="selectedFile">
+          <i class="bi bi-code-square me-2"></i>
+          {{selectedFile?.name}}
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="json-editor-container">
+          <textarea class="form-control json-editor" [(ngModel)]="jsonEditorContent" rows="20"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cerrar</button>
+        <button type="button" class="btn btn-primary" (click)="saveJsonChanges()">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.file-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.file-list .list-group-item {
+  border-left: 3px solid transparent;
+}
+
+.file-list .list-group-item.active {
+  border-left: 3px solid #0d6efd;
+  background-color: rgba(13, 110, 253, 0.1);
+  color: #212529;
+}
+
+.file-content-preview {
+  border: 1px solid #dee2e6;
+  border-top: none;
+  border-radius: 0 0 0.25rem 0.25rem;
+}
+
+.file-content-preview pre {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+</style> 

@@ -1,0 +1,823 @@
+<div class="card shadow-sm" [class.fullscreen-mode]="isFullscreen">
+  <div class="card-header bg-white">
+    <div class="d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center">
+        <i class="bi bi-diagram-3 fs-4 text-primary me-2"></i>
+        <h5 class="card-title mb-0">Editor de Flujo SAP</h5>
+      </div>
+      <div class="toolbar-actions">
+        <button class="btn btn-sm btn-outline-secondary me-2" (click)="toggleFullscreen()" title="Pantalla completa (F11)">
+          <i class="bi" [ngClass]="isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'"></i>
+        </button>
+        <button class="btn btn-sm btn-primary me-2" (click)="saveChanges()" [disabled]="flowNodes.length === 0">
+          <i class="bi bi-save me-1"></i> Guardar
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" (click)="cancelEditing()">
+          <i class="bi bi-x-circle me-1"></i> Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="card-body p-0">
+    <div class="row g-0">
+      <!-- Paleta de elementos -->
+      <div class="col-md-3 border-end palette-container" [class.collapsed]="isFullscreen">
+        <div class="palette-toggle" *ngIf="isFullscreen" (click)="isFullscreen = !isFullscreen">
+          <i class="bi bi-chevron-right"></i>
+        </div>
+        <div class="p-3">
+          <h6 class="mb-3 text-muted">Acciones SAP</h6>
+          
+          <div class="palette-items d-flex flex-wrap gap-2">
+            <div *ngFor="let item of flowElements"
+                 class="palette-item rounded bg-light text-center p-2"
+                 draggable="true"
+                 (dragstart)="onDragStart($event, item)">
+              <i class="bi" [ngClass]="getBootstrapIcon(item.type)"></i>
+              <div class="small mt-1">{{item.label}}</div>
+            </div>
+          </div>
+          
+          <hr class="my-3">
+          
+          <!-- Sección de botones como acordeón -->
+          <div class="accordion-section mb-3">
+            <div class="accordion-header d-flex align-items-center justify-content-between p-2 rounded bg-light cursor-pointer" 
+                 (click)="toggleAccordion('buttons')">
+              <span class="fw-medium">Acciones de Flujo</span>
+              <i class="bi" [ngClass]="accordionState['buttons'] ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+            </div>
+            
+            <div class="accordion-body" [ngClass]="{'show': accordionState['buttons']}">
+              <div class="d-grid gap-2">
+                <button class="btn btn-sm btn-outline-primary" (click)="viewFullJson()" [disabled]="flowNodes.length === 0">
+                  <i class="bi bi-code-slash me-1"></i> Ver JSON
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" (click)="autoArrangeNodes()" [disabled]="flowNodes.length === 0">
+                  <i class="bi bi-grid-3x3 me-1"></i> Organizar Flujo
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Tipos de acciones como acordeón -->
+          <div class="accordion-section mb-3">
+            <div class="accordion-header d-flex align-items-center justify-content-between p-2 rounded bg-light cursor-pointer" 
+                 (click)="toggleAccordion('types')">
+              <span class="fw-medium">Tipos de acciones SAP</span>
+              <i class="bi" [ngClass]="accordionState['types'] ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+            </div>
+            
+            <div class="accordion-body" [ngClass]="{'show': accordionState['types']}">
+              <ul class="list-unstyled small">
+                <li><i class="bi bi-play-circle text-success me-1"></i> click - Clic en elemento</li>
+                <li><i class="bi bi-input-cursor-text text-primary me-1"></i> set - Establecer valor</li>
+                <li><i class="bi bi-box-arrow-in-right text-warning me-1"></i> callProgram - Iniciar transacción</li>
+                <li><i class="bi bi-diagram-3 text-info me-1"></i> callSubflow - Ejecutar subflujo</li>
+                <li><i class="bi bi-box-arrow-right text-danger me-1"></i> exit - Finalizar flujo</li>
+              </ul>
+            </div>
+          </div>
+          
+          <!-- Gestor de Subflujos como acordeón -->
+          <div class="accordion-section">
+            <div class="accordion-header d-flex align-items-center justify-content-between p-2 rounded bg-light cursor-pointer" 
+                 (click)="toggleAccordion('subflows')">
+              <span class="fw-medium"><i class="bi bi-diagram-3 me-1"></i> Gestor de Subflujos</span>
+              <i class="bi" [ngClass]="accordionState['subflows'] ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+            </div>
+            
+            <div class="accordion-body" [ngClass]="{'show': accordionState['subflows']}">
+              <div>
+                <div class="input-group input-group-sm mb-2">
+                  <input type="text" class="form-control" placeholder="Buscar subflujo..." 
+                         [(ngModel)]="subflowSearchTerm" (input)="filterSubflows()">
+                  <button class="btn btn-outline-secondary" type="button" (click)="filterSubflows()">
+                    <i class="bi bi-search"></i>
+                  </button>
+                </div>
+                
+                <div class="d-grid mb-2">
+                  <button class="btn btn-sm btn-outline-info" (click)="createNewSubflow()">
+                    <i class="bi bi-plus-circle me-1"></i> Crear Nuevo Subflujo
+                  </button>
+                </div>
+                
+                <div class="subflujo-list">
+                  <div *ngIf="filteredSubflows.length === 0" class="text-center text-muted small py-2">
+                    No se encontraron subflujos
+                  </div>
+                  
+                  <div *ngFor="let subflow of filteredSubflows" 
+                       class="subflujo-item p-2 rounded mb-1" 
+                       [class.active]="selectedSubflow?.id === subflow.id"
+                       (click)="selectSubflow(subflow)">
+                    <div class="d-flex align-items-center">
+                      <i class="bi bi-diagram-3 text-info me-2"></i>
+                      <span class="subflujo-name small">{{subflow.label || subflow.data?.name || 'Subflujo sin nombre'}}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="subflujo-actions mt-2 d-grid gap-2" *ngIf="selectedSubflow">
+                  <button class="btn btn-sm btn-outline-primary" (click)="openSubflowEditor()">
+                    <i class="bi bi-pencil me-1"></i> Editar
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="duplicateSelectedSubflow()">
+                    <i class="bi bi-files me-1"></i> Duplicar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Filtros por tipo de control como acordeón -->
+          <div class="accordion-section">
+            <div class="accordion-header d-flex align-items-center justify-content-between p-2 rounded bg-light cursor-pointer" 
+                 (click)="toggleAccordion('filters')">
+              <span class="fw-medium"><i class="bi bi-funnel me-1"></i> Filtrar por ControlType</span>
+              <i class="bi" [ngClass]="accordionState['filters'] ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+            </div>
+            
+            <div class="accordion-body" [ngClass]="{'show': accordionState['filters']}">
+              <div>
+                <!-- Indicador de filtro activo -->
+                <div class="alert alert-info py-1 px-2 small mb-2" *ngIf="isFilterActive">
+                  <i class="bi bi-info-circle me-1"></i> Filtro activo: {{selectedControlTypes.length}} tipos seleccionados
+                </div>
+                
+                <!-- Lista de tipos de controles -->
+                <div class="filter-list">
+                  <div *ngIf="availableControlTypes.length === 0" class="text-center text-muted small py-2">
+                    No se encontraron tipos de controles
+                  </div>
+                  
+                  <div *ngFor="let controlType of availableControlTypes" 
+                       class="form-check mb-1">
+                    <input class="form-check-input" type="checkbox" 
+                           [id]="'control-type-' + controlType"
+                           [checked]="selectedControlTypes.includes(controlType)"
+                           (change)="toggleControlTypeFilter(controlType)">
+                    <label class="form-check-label small" [for]="'control-type-' + controlType">
+                      {{controlType}}
+                    </label>
+                  </div>
+                </div>
+                
+                <!-- Botón para resetear filtros -->
+                <div class="d-grid mt-2" *ngIf="selectedControlTypes.length > 0">
+                  <button class="btn btn-sm btn-outline-secondary" (click)="resetFilters()">
+                    <i class="bi bi-x-circle me-1"></i> Limpiar filtros
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Lienzo de edición -->
+      <div class="col-md-9 position-relative" [class.col-md-12]="isFullscreen">
+        <!-- Controles de zoom y desplazamiento -->
+        <div class="canvas-controls">
+          <div class="btn-group">
+            <button class="btn btn-sm btn-dark" (click)="zoomIn()" title="Acercar (Ctrl++)">
+              <i class="bi bi-zoom-in"></i>
+            </button>
+            <button class="btn btn-sm btn-dark" (click)="resetZoom()" title="Restablecer zoom (Ctrl+0)">
+              <i class="bi bi-aspect-ratio"></i>
+            </button>
+            <button class="btn btn-sm btn-dark" (click)="zoomOut()" title="Alejar (Ctrl+-)">
+              <i class="bi bi-zoom-out"></i>
+            </button>
+            <button class="btn btn-sm btn-dark" (click)="centerCanvas()" title="Centrar flujo (Ctrl+H)">
+              <i class="bi bi-arrows-fullscreen"></i>
+            </button>
+            <button class="btn btn-sm btn-dark" (click)="toggleGrid()" title="Mostrar/ocultar cuadrícula (Ctrl+G)">
+              <i class="bi bi-grid-3x3"></i>
+            </button>
+            <button class="btn btn-sm btn-dark" (click)="toggleDarkMode()" title="Cambiar tema (Ctrl+D)">
+              <i class="bi" [ngClass]="isDarkMode ? 'bi-sun' : 'bi-moon'"></i>
+            </button>
+          </div>
+          <div class="zoom-info">
+            {{(zoomLevel * 100).toFixed(0)}}%
+          </div>
+        </div>
+        
+        <div class="flow-canvas"
+             [ngClass]="{'dark-mode': isDarkMode, 'light-mode': !isDarkMode}"
+             [style.height]="canvasHeight"
+             (dragover)="onCanvasDragOver($event)"
+             (drop)="onCanvasDrop($event)"
+             (mousedown)="startPanning($event)"
+             (mousemove)="doPanning($event)"
+             (mouseup)="stopPanning()"
+             (mouseleave)="stopPanning()">
+          
+          <!-- Contenedor con zoom -->
+          <div class="zoom-container" 
+               [style.transform]="'scale(' + zoomLevel + ')'"
+               [style.transform-origin]="'top left'"
+               [style.margin-left.px]="panOffsetX"
+               [style.margin-top.px]="panOffsetY">
+            
+            <!-- Mensaje cuando no hay flujo -->
+            <div *ngIf="flowNodes.length === 0" class="empty-flow-message">
+              <div class="text-center">
+                <i class="bi bi-diagram-3 display-4 text-muted mb-3"></i>
+                <h5 class="text-muted">No hay flujo cargado</h5>
+                <p class="text-muted small">Procese un archivo para visualizar el flujo</p>
+              </div>
+            </div>
+            
+            <!-- Nodos del flujo -->
+            <div *ngFor="let node of filteredFlowNodes" 
+                 class="flow-node shadow-sm" 
+                 [class.border-primary]="selectedNode?.id === node.id"
+                 [style.left.px]="node.x" 
+                 [style.top.px]="node.y"
+                 draggable="true"
+                 (dragstart)="onNodeDragStart($event, node)"
+                 (click)="selectNode(node)">
+              <div class="node-header" [ngClass]="{'bg-primary text-white': node.type === 'action', 'bg-warning': node.type === 'decision', 'bg-info text-white': node.type === 'subflow'}">
+                <i class="bi me-1" [ngClass]="getBootstrapIcon(node.type)"></i>
+                <span class="node-label">{{node.label}}</span>
+                <button *ngIf="selectedNode?.id === node.id" 
+                        class="btn btn-sm btn-close ms-auto p-0" 
+                        (click)="deleteNode()">
+                </button>
+              </div>
+              <div class="node-content">
+                <!-- Contenido del nodo basado en su tipo -->
+                <div class="text-center small">
+                  <div *ngIf="node.data?.action" class="mb-1">
+                    <span class="badge" [ngClass]="{
+                      'bg-success': node.data.action === 'click',
+                      'bg-primary': node.data.action === 'set',
+                      'bg-warning text-dark': node.data.action === 'callProgram',
+                      'bg-info': node.data.action === 'callSubflow',
+                      'bg-danger': node.data.action === 'exit'
+                    }">{{node.data.action}}</span>
+                  </div>
+                  <div *ngIf="node.data?.target" class="text-truncate small" style="max-width: 150px;" title="{{node.data.target}}">
+                    <i class="bi bi-cursor me-1"></i> {{node.data.target}}
+                  </div>
+                  <div *ngIf="node.data?.paramKey" class="text-truncate small text-primary" style="max-width: 150px;">
+                    <i class="bi bi-key me-1"></i> {{node.data.paramKey}}
+                  </div>
+                  <div *ngIf="node.data?.controlType" class="text-truncate small text-secondary mt-1" style="max-width: 150px;">
+                    <i class="bi bi-tag me-1"></i> {{node.data.controlType}}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Conexiones entre nodos -->
+            <svg class="connections-layer" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer-events: none;">
+              <path *ngFor="let conn of connections" 
+                    [attr.d]="getPathForConnection(conn)"
+                    class="connection-path"
+                    stroke="#0d6efd"
+                    stroke-width="2"
+                    fill="none"
+                    marker-end="url(#arrowhead)">
+              </path>
+              
+              <!-- Definición de marcadores para las flechas -->
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                  refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="#0d6efd" />
+                </marker>
+              </defs>
+            </svg>
+          </div>
+        </div>
+        
+        <!-- Indicador de ayuda para navegación -->
+        <div class="canvas-help-text" [class.fullscreen-help]="isFullscreen">
+          <small class="text-muted">
+            <i class="bi bi-info-circle me-1"></i>
+            <span *ngIf="!isFullscreen">Use Ctrl+Rueda para zoom, Ctrl+Arrastrar para desplazar el lienzo</span>
+            <span *ngIf="isFullscreen">F11: Salir de pantalla completa | Ctrl+Rueda: Zoom | Ctrl+Arrastrar: Desplazar | Ctrl+G: Cuadrícula | Ctrl+R: Organizar</span>
+          </small>
+        </div>
+        
+        <!-- Mensaje para salir de pantalla completa -->
+        <div *ngIf="isFullscreen" class="fullscreen-exit-message">
+          PARA SALIR DE LA PANTALLA COMPLETA, PULSA <kbd>ESC</kbd>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="card-footer bg-light" *ngIf="selectedNode">
+    <div class="row align-items-center">
+      <div class="col-md-4">
+        <div class="fw-medium">Nodo: <span class="text-primary">{{selectedNode.label}}</span></div>
+        <div class="small text-muted" *ngIf="selectedNode.data?.action">
+          Acción: {{selectedNode.data.action}}
+        </div>
+      </div>
+      <div class="col-md-8">
+        <div class="d-flex gap-2 justify-content-end">
+          <button class="btn btn-sm btn-outline-primary" (click)="updateNode()">
+            <i class="bi bi-code-square me-1"></i> Editar JSON
+          </button>
+          <button class="btn btn-sm btn-outline-danger" (click)="deleteNode()">
+            <i class="bi bi-trash me-1"></i> Eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para editar JSON del nodo -->
+<div class="modal" [class.show]="showNodeEditor" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-backdrop" *ngIf="showNodeEditor" (click)="closeNodeJsonEditor()"></div>
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content bg-dark text-white" *ngIf="showNodeEditor">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-code-square me-2"></i>
+          Editar JSON del Nodo: {{editingNodeId}}
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="closeNodeJsonEditor()"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="json-editor-container">
+          <div *ngIf="nodeJsonError" class="alert alert-danger m-2">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            {{nodeJsonError}}
+          </div>
+          <textarea 
+            class="form-control json-editor" 
+            [(ngModel)]="nodeJsonContent" 
+            rows="15"
+            spellcheck="false"
+            placeholder="Edite el JSON del nodo aquí..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="text-muted small me-auto">
+          <i class="bi bi-info-circle me-1"></i>
+          Edite el JSON y guarde para actualizar el nodo
+        </div>
+        <button type="button" class="btn btn-outline-light" (click)="closeNodeJsonEditor()">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="saveNodeJsonChanges()">
+          <i class="bi bi-check2 me-1"></i>
+          Guardar Cambios
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para editar subflujo visualmente -->
+<div class="modal" [class.show]="showSubflowEditor" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-backdrop" *ngIf="showSubflowEditor" (click)="closeSubflowEditor()"></div>
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content" *ngIf="showSubflowEditor && selectedSubflow">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-diagram-3 me-2"></i>
+          Editar Subflujo
+        </h5>
+        <button type="button" class="btn-close" (click)="closeSubflowEditor()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Nombre del Subflujo</label>
+            <input type="text" class="form-control" [(ngModel)]="editingSubflow.label" placeholder="Nombre visible">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">ID Interno</label>
+            <input type="text" class="form-control" [(ngModel)]="editingSubflow.data.name" placeholder="ID técnico">
+          </div>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Descripción</label>
+          <textarea class="form-control" [(ngModel)]="editingSubflow.data.description" rows="2"></textarea>
+        </div>
+        
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Target (opcional)</label>
+            <input type="text" class="form-control" [(ngModel)]="editingSubflow.data.target" placeholder="Target del subflujo">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Parámetro (opcional)</label>
+            <input type="text" class="form-control" [(ngModel)]="editingSubflow.data.paramKey" placeholder="Clave de parámetro">
+          </div>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Acciones del Subflujo</label>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+              <thead class="table-light">
+                <tr>
+                  <th>Acción</th>
+                  <th>Target</th>
+                  <th>Valor</th>
+                  <th style="width: 50px"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngIf="!editingSubflow.data.actions || editingSubflow.data.actions.length === 0">
+                  <td colspan="4" class="text-center text-muted py-3">
+                    No hay acciones definidas para este subflujo
+                  </td>
+                </tr>
+                <tr *ngFor="let action of editingSubflow.data.actions; let i = index">
+                  <td>
+                    <select class="form-select form-select-sm" [(ngModel)]="action.action">
+                      <option value="click">click</option>
+                      <option value="set">set</option>
+                      <option value="callProgram">callProgram</option>
+                      <option value="callSubflow">callSubflow</option>
+                      <option value="exit">exit</option>
+                    </select>
+                  </td>
+                  <td>
+                    <input type="text" class="form-control form-control-sm" [(ngModel)]="action.target">
+                  </td>
+                  <td>
+                    <input type="text" class="form-control form-control-sm" [(ngModel)]="action.value">
+                  </td>
+                  <td class="text-center">
+                    <button class="btn btn-sm btn-outline-danger" (click)="removeSubflowAction(i)">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="4">
+                    <button class="btn btn-sm btn-outline-primary w-100" (click)="addSubflowAction()">
+                      <i class="bi bi-plus-circle me-1"></i> Añadir Acción
+                    </button>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" (click)="closeSubflowEditor()">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="saveSubflowChanges()">
+          <i class="bi bi-check2 me-1"></i>
+          Guardar Cambios
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para ver el JSON completo -->
+<div class="modal" [class.show]="isEditing" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-backdrop" *ngIf="isEditing" (click)="cancelEditing()"></div>
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content bg-dark text-white" *ngIf="isEditing">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-code-square me-2"></i>
+          JSON del Flujo Completo
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cancelEditing()"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="json-editor-container">
+          <pre class="json-viewer">{{flowCode}}</pre>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-light" (click)="cancelEditing()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.flow-canvas {
+  background: #2a3038;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+  overflow: auto;
+  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.05);
+  transition: height 0.3s ease;
+}
+
+.flow-canvas.grid-visible {
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.flow-canvas.dark-mode {
+  background-color: #2a3038;
+  color: #ffffff;
+}
+
+.flow-canvas.light-mode {
+  background-color: #f8f9fa;
+  color: #212529;
+  background-image: 
+    linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+}
+
+.zoom-container {
+  position: absolute;
+  width: 5000px;
+  height: 5000px;
+  transition: transform 0.1s ease-out;
+}
+
+.flow-node {
+  position: absolute;
+  width: 180px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  cursor: move;
+  z-index: 10;
+}
+
+.node-header {
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  border-radius: 4px 4px 0 0;
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+}
+
+.node-content {
+  padding: 10px;
+}
+
+.palette-item {
+  cursor: grab;
+  transition: all 0.2s;
+}
+
+.palette-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.connection-path {
+  stroke-dasharray: none;
+  transition: stroke-dasharray 0.3s;
+}
+
+.connection-path:hover {
+  stroke-dasharray: 5;
+}
+
+.empty-flow-message {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  max-width: 300px;
+  padding: 20px;
+  background-color: rgba(42, 48, 56, 0.7);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Controles del canvas */
+.canvas-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: rgba(33, 37, 41, 0.7);
+  padding: 5px;
+  border-radius: 4px;
+}
+
+.zoom-info {
+  color: white;
+  font-size: 12px;
+  min-width: 40px;
+  text-align: center;
+}
+
+.canvas-help-text {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background-color: rgba(33, 37, 41, 0.7);
+  padding: 5px 10px;
+  border-radius: 4px;
+  color: white;
+}
+
+.canvas-help-text.fullscreen-help {
+  bottom: 20px;
+  padding: 8px 15px;
+  font-size: 1.1em;
+}
+
+/* Estilos para el modo pantalla completa */
+.fullscreen-mode {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  background-color: #fff !important;
+  overflow: hidden !important;
+}
+
+.fullscreen-mode .card-body {
+  height: calc(100vh - 110px) !important;
+  padding: 0 !important;
+}
+
+.fullscreen-mode .flow-canvas {
+  height: 100% !important;
+  border-radius: 0 !important;
+}
+
+.editor-fullscreen {
+  overflow: hidden !important;
+}
+
+/* Mensaje de salida de pantalla completa */
+.fullscreen-exit-message {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(33, 37, 41, 0.8);
+  color: white;
+  padding: 8px 15px;
+  border-radius: 4px;
+  z-index: 10000;
+  font-size: 14px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  transition: opacity 0.5s;
+  opacity: 1;
+}
+
+.fullscreen-exit-message.fade-out {
+  opacity: 0;
+}
+
+.palette-container {
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.palette-container.collapsed {
+  width: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.palette-toggle {
+  position: absolute;
+  top: 50%;
+  right: -15px;
+  width: 30px;
+  height: 30px;
+  background-color: #0d6efd;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 100;
+  transform: translateY(-50%);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* Estilos para el modal */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1050;
+}
+
+.modal.show {
+  display: block;
+}
+
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1040;
+}
+
+.modal-dialog {
+  position: relative;
+  width: auto;
+  margin: 1.75rem auto;
+  z-index: 1050;
+}
+
+.json-editor {
+  width: 100%;
+  min-height: 300px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #f8f9fa;
+  background-color: #212529;
+  border: none;
+  border-radius: 0;
+  padding: 15px;
+  resize: none;
+}
+
+.json-editor:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.json-viewer {
+  width: 100%;
+  min-height: 300px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #f8f9fa;
+  background-color: #212529;
+  border: none;
+  border-radius: 0;
+  padding: 15px;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+/* Estilos para atajos de teclado */
+.keyboard-shortcut {
+  display: inline-block;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 3px;
+  padding: 2px 5px;
+  font-size: 0.8em;
+  color: #495057;
+  margin: 0 2px;
+}
+
+/* Estilos responsivos para pantalla completa */
+@media (max-width: 768px) {
+  .fullscreen-mode .card-header {
+    padding: 0.5rem;
+  }
+  
+  .fullscreen-mode .card-title {
+    font-size: 1rem;
+  }
+  
+  .canvas-controls {
+    top: 5px;
+    right: 5px;
+  }
+  
+  .canvas-help-text {
+    bottom: 5px;
+    right: 5px;
+    font-size: 0.7em;
+  }
+}
+</style> 

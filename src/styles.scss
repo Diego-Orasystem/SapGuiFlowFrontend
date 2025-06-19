@@ -1,0 +1,371 @@
+/* Importar Bootstrap */
+@import "bootstrap/scss/bootstrap";
+@import "bootstrap-icons/font/bootstrap-icons.css";
+
+/* Variables personalizadas de Bootstrap */
+:root {
+  /* Paleta de colores oscura con mayor contraste */
+  --bs-primary: #4a6bdf;
+  --bs-primary-rgb: 74, 107, 223;
+  --bs-primary-darker: #3451b2;
+  --bs-secondary: #555a64;
+  --bs-secondary-rgb: 85, 90, 100;
+  --bs-success: #26a69a;
+  --bs-success-rgb: 38, 166, 154;
+  --bs-info: #5c6bc0;
+  --bs-info-rgb: 92, 107, 192;
+  --bs-warning: #f39c12;
+  --bs-warning-rgb: 243, 156, 18;
+  --bs-danger: #e74c3c;
+  --bs-danger-rgb: 231, 76, 60;
+  --bs-light: #f0f0f0;
+  --bs-light-rgb: 240, 240, 240;
+  --bs-dark: #2c3e50;
+  --bs-dark-rgb: 44, 62, 80;
+  --bs-body-bg: #303841;
+  --bs-body-color: #eaeaea;
+  --bs-font-sans-serif: 'Roboto', system-ui, -apple-system, "Segoe UI", sans-serif;
+  --bs-border-radius: 0.375rem;
+  --bs-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+/* Estilos globales */
+body {
+  font-family: var(--bs-font-sans-serif);
+  background-color: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  margin: 0;
+  padding: 0;
+}
+
+/* Personalización de componentes de Bootstrap */
+.card {
+  border: none;
+  border-radius: var(--bs-border-radius);
+  box-shadow: var(--bs-box-shadow);
+  margin-bottom: 1.5rem;
+  background-color: #3a4750;
+  color: #eaeaea;
+}
+
+.card-header {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1rem 1.5rem;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.btn-primary {
+  background-color: var(--bs-primary);
+  border-color: var(--bs-primary);
+  color: #ffffff;
+  
+  &:hover, &:focus, &:active {
+    background-color: var(--bs-primary-darker);
+    border-color: var(--bs-primary-darker);
+    color: #ffffff;
+  }
+}
+
+/* Estilos para la aplicación SAP GUI Flow */
+.sap-gui-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.header {
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Estilos para los componentes */
+.file-upload-container, 
+.flow-editor-container, 
+.file-preview-container, 
+.export-tools-container {
+  width: 100%;
+}
+
+/* Estilos para el editor de flujo */
+.flow-canvas {
+  background: #2a3038;
+  position: relative;
+  min-height: 400px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--bs-border-radius);
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+  overflow: auto;
+  box-shadow: var(--bs-box-shadow);
+}
+
+.flow-node {
+  position: absolute;
+  width: 160px;
+  min-height: 70px;
+  background: #3a4750;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  user-select: none;
+  z-index: 1;
+  
+  &:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
+  }
+  
+  &.selected {
+    border: 2px solid var(--bs-primary);
+    box-shadow: 0 0 0 3px rgba(var(--bs-primary-rgb), 0.25);
+  }
+  
+  .node-header {
+    background-color: var(--bs-primary);
+    color: white;
+    padding: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: calc(var(--bs-border-radius) - 1px) calc(var(--bs-border-radius) - 1px) 0 0;
+    display: flex;
+    align-items: center;
+    
+    i {
+      margin-right: 0.5rem;
+      color: #ffffff;
+    }
+  }
+  
+  .node-content {
+    padding: 0.5rem;
+    color: #eaeaea;
+  }
+}
+
+.flow-palette {
+  background: #3a4750;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--bs-border-radius);
+  padding: 1rem;
+  margin-top: 1rem;
+  box-shadow: var(--bs-box-shadow);
+  
+  h4 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+    color: #eaeaea;
+    font-weight: 500;
+  }
+  
+  .palette-items {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  
+  .palette-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--bs-border-radius);
+    cursor: move;
+    padding: 0.5rem;
+    background-color: #2a3038;
+    transition: all 0.2s;
+    
+    &:hover {
+      background-color: rgba(var(--bs-primary-rgb), 0.2);
+      border-color: var(--bs-primary);
+    }
+    
+    i {
+      font-size: 1.5rem;
+      margin-bottom: 0.25rem;
+      color: var(--bs-primary);
+    }
+    
+    span {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #eaeaea;
+    }
+  }
+}
+
+/* Área de subida de archivos */
+.upload-area {
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: var(--bs-border-radius);
+  padding: 2rem;
+  text-align: center;
+  background-color: #2a3038;
+  transition: all 0.3s;
+  
+  &.dragging {
+    border-color: var(--bs-primary);
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+  }
+  
+  .upload-icon {
+    font-size: 3rem;
+    color: var(--bs-primary);
+    margin-bottom: 1rem;
+  }
+  
+  .upload-message {
+    margin-bottom: 1rem;
+    color: #aaaaaa;
+    
+    p {
+      margin-bottom: 0.5rem;
+    }
+  }
+}
+
+.selected-file {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  
+  .file-details {
+    background-color: #2a3038;
+    padding: 1rem;
+    border-radius: var(--bs-border-radius);
+    margin: 1rem 0;
+    box-shadow: var(--bs-box-shadow);
+    
+    .file-name {
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+      color: #eaeaea;
+    }
+    
+    .file-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.875rem;
+      color: #aaaaaa;
+    }
+  }
+}
+
+.error-message {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background-color: rgba(var(--bs-danger-rgb), 0.2);
+  border: 1px solid rgba(var(--bs-danger-rgb), 0.3);
+  border-radius: var(--bs-border-radius);
+  color: #f8d7da;
+  font-weight: 500;
+}
+
+/* Lista de archivos */
+.file-list {
+  .empty-state {
+    padding: 1.5rem;
+    text-align: center;
+    background-color: #2a3038;
+    border-radius: var(--bs-border-radius);
+    color: #aaaaaa;
+    box-shadow: var(--bs-box-shadow);
+  }
+  
+  .file-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--bs-border-radius);
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    background-color: #3a4750;
+    box-shadow: var(--bs-box-shadow);
+    
+    &:hover {
+      background-color: rgba(var(--bs-primary-rgb), 0.1);
+    }
+    
+    &.selected {
+      background-color: rgba(var(--bs-primary-rgb), 0.2);
+      border-color: var(--bs-primary);
+    }
+    
+    .file-icon {
+      margin-right: 1rem;
+      color: var(--bs-primary);
+    }
+    
+    .file-info {
+      flex: 1;
+      
+      .file-name {
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+        color: #eaeaea;
+      }
+      
+      .file-meta {
+        display: flex;
+        gap: 1rem;
+        font-size: 0.75rem;
+        color: #aaaaaa;
+      }
+    }
+  }
+}
+
+/* Botones y acciones */
+.btn {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  transition: all 0.2s;
+}
+
+.btn-secondary {
+  background-color: var(--bs-secondary);
+  border-color: var(--bs-secondary);
+  color: #ffffff;
+  
+  &:hover, &:focus, &:active {
+    background-color: #47494f;
+    border-color: #47494f;
+  }
+}
+
+/* Estilos para elementos con tema oscuro */
+.text-muted {
+  color: #aaaaaa !important;
+}
+
+.bg-white {
+  background-color: #3a4750 !important;
+}
+
+.bg-light {
+  background-color: #2a3038 !important;
+}
+
+.border-bottom {
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Importar fuentes */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap'); 

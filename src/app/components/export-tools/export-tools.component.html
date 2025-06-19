@@ -1,0 +1,111 @@
+<div class="card shadow-sm">
+  <div class="card-header bg-white">
+    <div class="d-flex align-items-center">
+      <i class="bi bi-box-arrow-right fs-4 text-primary me-2"></i>
+      <h5 class="card-title mb-0">Herramientas de Exportación</h5>
+    </div>
+  </div>
+  
+  <div class="card-body">
+    <div class="row align-items-center">
+      <div class="col-md-4">
+        <div class="bg-light rounded p-3 text-center">
+          <h6 class="mb-3">Archivos generados</h6>
+          <div class="d-flex align-items-center justify-content-center">
+            <div class="display-6 fw-bold text-primary">{{outputFiles.length}}</div>
+            <div class="ms-2 text-muted small">archivos</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-8">
+        <div class="d-grid gap-2">
+          <button 
+            class="btn btn-primary" 
+            [disabled]="outputFiles.length === 0 || isExporting"
+            (click)="exportAllFiles()">
+            <i class="bi" [ngClass]="isExporting ? 'bi-arrow-repeat spin' : 'bi-download'"></i>
+            <span *ngIf="!isExporting"> Exportar todos los archivos</span>
+            <span *ngIf="isExporting"> Exportando...</span>
+          </button>
+          
+          <button 
+            class="btn btn-outline-secondary" 
+            [disabled]="outputFiles.length === 0 || isVerifying"
+            (click)="verifyFlowIntegrity()">
+            <i class="bi" [ngClass]="isVerifying ? 'bi-arrow-repeat spin' : 'bi-clipboard-check'"></i>
+            <span *ngIf="!isVerifying"> Verificar integridad</span>
+            <span *ngIf="isVerifying"> Verificando...</span>
+          </button>
+        </div>
+        
+        <div class="alert alert-info mt-3" *ngIf="outputFiles.length === 0">
+          <i class="bi bi-info-circle-fill me-2"></i>
+          No hay archivos disponibles para exportar. Procese algunos archivos primero.
+        </div>
+      </div>
+    </div>
+    
+    <!-- Resultados de verificación -->
+    <div *ngIf="verificationResult" class="mt-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0">Resultados de verificación</h6>
+        <button class="btn btn-sm btn-close" (click)="clearVerificationResults()"></button>
+      </div>
+      
+      <div class="alert" [ngClass]="verificationResult.valid ? 'alert-success' : 'alert-danger'">
+        <div *ngIf="verificationResult.valid">
+          <i class="bi bi-check-circle-fill me-2"></i>
+          Todos los flujos son válidos y están correctamente estructurados.
+        </div>
+        <div *ngIf="!verificationResult.valid">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          Se encontraron problemas en los flujos:
+          <ul class="mt-2 mb-0">
+            <li *ngFor="let error of verificationResult.errors">{{error}}</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Lista de archivos -->
+    <div class="mt-4" *ngIf="outputFiles.length > 0">
+      <h6 class="mb-3">Lista de archivos disponibles</h6>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover">
+          <thead class="table-light">
+            <tr>
+              <th>Nombre</th>
+              <th>Tamaño</th>
+              <th>Modificado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let file of outputFiles">
+              <td>{{file.name}}</td>
+              <td>{{file.size | number}} bytes</td>
+              <td>{{file.modified | date:'short'}}</td>
+              <td>
+                <button class="btn btn-sm btn-outline-primary" (click)="exportSingleFile(file)" title="Exportar archivo">
+                  <i class="bi bi-download"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .spin {
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+</style> 

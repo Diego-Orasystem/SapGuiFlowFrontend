@@ -1,0 +1,78 @@
+<div class="card shadow-sm h-100 border-0">
+  <div class="card-body p-3">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h6 class="mb-0">Selecciona un archivo ZIP</h6>
+      <button class="btn btn-sm btn-success" (click)="loadDemoData()" [disabled]="isLoading">
+        <i class="bi bi-database-fill-check me-1"></i> Usar Datos de Prueba
+      </button>
+    </div>
+    
+    <div class="upload-area rounded p-3" 
+         [ngClass]="{'border-primary bg-light': isDragging}"
+         (dragover)="onDragOver($event)"
+         (dragleave)="onDragLeave($event)"
+         (drop)="onDrop($event)">
+      
+      <div class="text-center">
+        <i class="bi bi-cloud-arrow-up fs-3 text-secondary mb-2"></i>
+        
+        <p class="mb-1 small">Arrastra y suelta un archivo ZIP aquí</p>
+        <p class="text-muted mb-2 small">o</p>
+        
+        <label class="btn btn-sm btn-primary">
+          <i class="bi bi-folder me-1"></i> Seleccionar archivo
+          <input type="file" class="d-none" accept=".zip" (change)="onFileSelected($event)">
+        </label>
+      </div>
+    </div>
+    
+    <div class="alert alert-success mt-3 py-2 small" *ngIf="demoDataLoaded">
+      <i class="bi bi-check-circle-fill me-2"></i>
+      Datos de prueba cargados correctamente.
+    </div>
+    
+    <div class="mt-3" *ngIf="selectedFile">
+      <div class="bg-light rounded p-2 mb-2">
+        <div class="d-flex align-items-center">
+          <i class="bi bi-file-earmark-zip text-primary me-2"></i>
+          <span class="small fw-medium">{{selectedFile.name}}</span>
+        </div>
+        
+        <div class="d-flex justify-content-between text-muted small" *ngIf="fileInfo">
+          <span><i class="bi bi-hdd me-1"></i> {{fileInfo.size}}</span>
+          <span><i class="bi bi-calendar me-1"></i> {{fileInfo.date}}</span>
+        </div>
+      </div>
+      
+      <button class="btn btn-sm btn-primary w-100" (click)="uploadFile()" [disabled]="isLoading">
+        <i class="bi" [ngClass]="isLoading ? 'bi-arrow-repeat spin' : 'bi-upload'"></i>
+        <span *ngIf="!isLoading"> Cargar archivo</span>
+        <span *ngIf="isLoading"> Cargando...</span>
+      </button>
+    </div>
+    
+    <div class="alert alert-danger mt-3 py-2 small" *ngIf="uploadError">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+      {{uploadError}}
+    </div>
+  </div>
+</div>
+
+<style>
+  .spin {
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  
+  .upload-area {
+    border: 2px dashed #ccc;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+</style> 
