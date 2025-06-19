@@ -7,14 +7,17 @@ WORKDIR /app
 # Copiar archivos de configuración de dependencias
 COPY package*.json ./
 
-# Instalar dependencias
-RUN npm ci --only=production
+# Instalar todas las dependencias (incluyendo devDependencies para el build)
+RUN npm ci
 
 # Copiar el código fuente
 COPY . .
 
 # Construir la aplicación para producción
 RUN npm run build
+
+# Limpiar devDependencies después del build para reducir el tamaño
+RUN npm prune --production
 
 # Etapa 2: Servir la aplicación con nginx
 FROM nginx:alpine
