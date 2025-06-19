@@ -4,7 +4,7 @@ import { BrowserModule } from '@angular/platform-browser';
 import { HttpClientModule } from '@angular/common/http';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { RouterModule, Routes } from '@angular/router';
-import { MonacoEditorModule } from 'ngx-monaco-editor';
+import { MonacoEditorModule } from 'ngx-monaco-editor-v2';
 import { FileSaverModule } from 'ngx-filesaver';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 
