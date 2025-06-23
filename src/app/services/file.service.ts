@@ -18,7 +18,7 @@ export interface FileInfo {
   providedIn: 'root'
 })
 export class FileService {
-  private apiUrl = 'http://localhost:3000/api/flow';
+  private apiUrl = 'http://10.90.0.24:3000/api/flow';
   
   private inputFileSubject = new BehaviorSubject<File | null>(null);
   private inputFilesSubject = new BehaviorSubject<FileInfo[]>([]);
