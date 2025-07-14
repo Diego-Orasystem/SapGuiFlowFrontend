@@ -66,28 +66,109 @@
   background-size: 20px 20px;
   overflow: auto;
   box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.05);
-  min-height: 500px;
+  min-height: 600px;
+  height: 70vh;
 }
 
 .flow-node {
   position: absolute;
-  width: 180px;
+  width: 280px;
+  min-height: 140px;
   background: white;
-  border-radius: 4px;
-  border: 1px solid #dee2e6;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border-radius: 8px;
+  border: 2px solid #dee2e6;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   cursor: move;
   z-index: 10;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: all 0.3s ease;
   
   &:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
     z-index: 20;
   }
   
   &.selected {
     border: 2px solid var(--bs-primary);
     box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+  }
+  
+  // Estilo especial para nodos container
+  &.container-node {
+    width: 350px;
+    min-height: 180px;
+    border-color: #0d6efd;
+    background: linear-gradient(135deg, #1a202c 0%, #2d3748 50%, #4a5568 100%);
+    box-shadow: 0 4px 16px rgba(13, 110, 253, 0.4);
+    cursor: pointer;
+    
+    &:hover {
+      box-shadow: 0 8px 25px rgba(13, 110, 253, 0.6);
+      transform: translateY(-3px);
+      border-color: #3182ce;
+    }
+    
+    .node-header {
+      background: linear-gradient(135deg, #3182ce 0%, #4299e1 100%);
+      color: white;
+      font-weight: 700;
+      font-size: 15px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+      
+      i {
+        color: #ffd700;
+        font-size: 18px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+      }
+    }
+    
+    .node-content {
+      color: #ffffff;
+      
+      .badge {
+        background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%) !important;
+        color: #ffffff !important;
+        font-weight: 700;
+        font-size: 12px;
+        padding: 6px 12px;
+        border-radius: 15px;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        
+        &.bg-purple {
+          background: linear-gradient(135deg, #805ad5 0%, #6b46c1 100%) !important;
+        }
+        
+        &.bg-success {
+          background: linear-gradient(135deg, #48bb78 0%, #38a169 100%) !important;
+        }
+        
+        &.bg-info {
+          background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%) !important;
+        }
+        
+        &.bg-warning {
+          background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%) !important;
+        }
+        
+        &.bg-danger {
+          background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%) !important;
+        }
+      }
+      
+      .text-muted {
+        color: #e2e8f0 !important;
+        font-weight: 600;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      }
+      
+      small {
+        color: #cbd5e0;
+        font-weight: 500;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      }
+    }
   }
 }
 
@@ -123,12 +204,45 @@
 }
 
 .node-content {
-  padding: 10px;
+  padding: 12px;
   
   .badge {
-    font-size: 0.7rem;
-    padding: 0.25em 0.5em;
-    font-weight: 500;
+    font-size: 0.75rem;
+    padding: 0.3em 0.6em;
+    font-weight: 600;
+    border-radius: 6px;
+    
+    &.bg-purple {
+      background-color: #6f42c1 !important;
+      color: white;
+    }
+    
+    &.bg-dark {
+      background-color: #212529 !important;
+      color: white;
+    }
+  }
+  
+  // Estilos especiales para containers
+  .container-node & {
+    .badge {
+      font-size: 0.65rem;
+      padding: 0.25em 0.5em;
+    }
+    
+    .d-flex.flex-wrap {
+      max-height: 60px;
+      overflow-y: auto;
+      
+      &::-webkit-scrollbar {
+        width: 3px;
+      }
+      
+      &::-webkit-scrollbar-thumb {
+        background: #dee2e6;
+        border-radius: 2px;
+      }
+    }
   }
 }
 
@@ -332,6 +446,64 @@
   }
 }
 
+/* Estilos para el control de espaciado */
+.spacing-controls {
+  .btn-spacing {
+    transition: all 0.2s ease;
+    
+    &:hover {
+      transform: translateY(-1px);
+    }
+    
+    &.active {
+      background-color: var(--bs-primary);
+      border-color: var(--bs-primary);
+      color: white;
+    }
+    
+    // Estilos específicos para botones de container
+    &.btn-success.active {
+      background-color: var(--bs-success);
+      border-color: var(--bs-success);
+      color: white;
+    }
+    
+    &.btn-outline-success:hover {
+      background-color: var(--bs-success);
+      border-color: var(--bs-success);
+      color: white;
+    }
+  }
+  
+  hr {
+    border-color: rgba(255, 255, 255, 0.1);
+    margin: 0.5rem 0;
+  }
+}
+
+/* Mejor espaciado para el acordeón */
+.accordion-section {
+  .accordion-header {
+    transition: all 0.2s ease;
+    
+    &:hover {
+      background-color: #e9ecef !important;
+      transform: translateY(-1px);
+    }
+  }
+  
+  .accordion-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    
+    &.show {
+      max-height: 500px;
+      padding-top: 10px;
+    }
+  }
+}
+
 /* Estilos para el gestor de subflujos */
 .subflujo-manager {
   margin-bottom: 1rem;
@@ -464,4 +636,106 @@
     white-space: nowrap;
     width: calc(100% - 20px);
   }
-} 
+}
+
+/* Estilos para el modal de edición de containers */
+.container-editor {
+  .table-responsive {
+    .btn-group {
+      display: flex !important;
+      gap: 4px;
+      
+      .btn {
+        min-width: 36px !important;
+        height: 36px !important;
+        padding: 6px 8px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        border-radius: 4px !important;
+        
+        &.btn-outline-primary {
+          color: #4299e1 !important;
+          border-color: #4299e1 !important;
+          background-color: transparent !important;
+          
+          &:hover {
+            background-color: #4299e1 !important;
+            color: white !important;
+            border-color: #4299e1 !important;
+          }
+        }
+        
+        &.btn-outline-danger {
+          color: #f56565 !important;
+          border-color: #f56565 !important;
+          background-color: transparent !important;
+          
+          &:hover {
+            background-color: #f56565 !important;
+            color: white !important;
+            border-color: #f56565 !important;
+          }
+        }
+        
+        i {
+          font-size: 14px !important;
+          margin: 0 !important;
+        }
+      }
+    }
+  }
+  
+  .table th:last-child,
+  .table td:last-child {
+    text-align: center !important;
+    width: 120px !important;
+    vertical-align: middle !important;
+  }
+  
+  .table td {
+    vertical-align: middle !important;
+  }
+}
+
+/* Estilos para z-index de modales */
+.modal {
+  z-index: 1050;
+  
+  &.modal-target-selector {
+    z-index: 1060 !important;
+    
+    .modal-backdrop {
+      z-index: 1055 !important;
+    }
+    
+    .modal-dialog {
+      z-index: 1060 !important;
+    }
+  }
+  
+  &.modal-sub-action-editor {
+    z-index: 1050 !important;
+    
+    .modal-backdrop {
+      z-index: 1045 !important;
+    }
+    
+    .modal-dialog {
+      z-index: 1050 !important;
+    }
+  }
+  
+  &.modal-container-editor {
+    z-index: 1040 !important;
+    
+    .modal-backdrop {
+      z-index: 1035 !important;
+    }
+    
+    .modal-dialog {
+      z-index: 1040 !important;
+    }
+  }
+}

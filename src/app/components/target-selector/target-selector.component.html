@@ -1,0 +1,173 @@
+<div class="target-selector">
+  <!-- Header con controles -->
+  <div class="target-selector-header">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0">
+        <i class="bi bi-target"></i>
+        Selectores disponibles
+        <span class="badge bg-secondary ms-2" *ngIf="targets">
+          {{filteredTargets.length}} / {{targets.summary.totalControls}}
+        </span>
+      </h5>
+      <div class="btn-group btn-group-sm">
+        <button class="btn btn-outline-secondary" 
+                [class.active]="showSuggestions"
+                (click)="toggleSuggestions()"
+                title="Mostrar sugerencias">
+          <i class="bi bi-lightbulb"></i>
+        </button>
+        <button class="btn btn-outline-secondary"
+                [class.active]="showAllTargets"
+                (click)="toggleShowAllTargets()"
+                title="Mostrar todos">
+          <i class="bi bi-grid"></i>
+        </button>
+        <button class="btn btn-outline-secondary"
+                (click)="toggleGroupBy()"
+                title="Cambiar agrupación">
+          <i class="bi bi-collection"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Barra de búsqueda -->
+    <div class="input-group mb-3">
+      <span class="input-group-text">
+        <i class="bi bi-search"></i>
+      </span>
+      <input type="text" 
+             class="form-control" 
+             placeholder="Buscar targets..."
+             [(ngModel)]="searchTerm"
+             (input)="onSearch()">
+      <button class="btn btn-outline-secondary" 
+              (click)="clearFilters()"
+              title="Limpiar filtros">
+        <i class="bi bi-x-circle"></i>
+      </button>
+    </div>
+
+    <!-- Filtros por tipo de control -->
+    <div class="control-type-filters mb-3" *ngIf="availableControlTypes.length > 0">
+      <div class="d-flex flex-wrap gap-1">
+        <button *ngFor="let controlType of availableControlTypes"
+                class="btn btn-sm"
+                [class]="'btn-outline-' + getControlTypeColor(controlType)"
+                [class.active]="isControlTypeSelected(controlType)"
+                (click)="onControlTypeToggle(controlType)"
+                title="{{controlType}}">
+          <i [class]="getControlTypeIcon(controlType)"></i>
+          {{controlType.replace('Gui', '')}}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading state -->
+  <div class="text-center py-4" *ngIf="isLoading">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Cargando...</span>
+    </div>
+    <p class="mt-2 text-muted">Cargando targets...</p>
+  </div>
+
+  <!-- Error state -->
+  <div class="alert alert-danger" *ngIf="error">
+    <i class="bi bi-exclamation-triangle"></i>
+    {{error}}
+  </div>
+
+  <!-- Targets agrupados por tipo -->
+  <div class="targets-container" *ngIf="!isLoading && !error && groupBy === 'type'">
+    <div *ngFor="let type of getTargetTypeKeys()" class="target-group mb-3">
+      <div class="target-group-header">
+        <h6 class="mb-2">
+          <i [class]="getControlTypeIcon(type)"></i>
+          {{type.replace('Gui', '')}}
+          <span class="badge bg-light text-dark ms-2">{{getTargetsByType()[type].length}}</span>
+        </h6>
+      </div>
+      <div class="target-list">
+        <div *ngFor="let target of getTargetsByType()[type]" 
+             class="target-item"
+             [class.selected]="selectedTargetId === target.Id"
+             (click)="selectTarget(target)">
+          <div class="target-info">
+            <div class="target-name">{{target.FriendlyName}}</div>
+            <div class="target-id text-muted">{{target.Id}}</div>
+            <div class="target-group-name text-muted small">{{target.FriendlyGroup}}</div>
+          </div>
+          <div class="target-actions">
+            <button class="btn btn-sm btn-outline-primary" 
+                    (click)="selectTarget(target); $event.stopPropagation()"
+                    title="Seleccionar">
+              <i class="bi bi-check"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Targets agrupados por grupo -->
+  <div class="targets-container" *ngIf="!isLoading && !error && groupBy === 'group'">
+    <div *ngFor="let group of getTargetGroupKeys()" class="target-group mb-3">
+      <div class="target-group-header">
+        <h6 class="mb-2">
+          <i class="bi bi-folder"></i>
+          {{group}}
+          <span class="badge bg-light text-dark ms-2">{{getTargetsByGroup()[group].length}}</span>
+        </h6>
+      </div>
+      <div class="target-list">
+        <div *ngFor="let target of getTargetsByGroup()[group]" 
+             class="target-item"
+             [class.selected]="selectedTargetId === target.Id"
+             (click)="selectTarget(target)">
+          <div class="target-info">
+            <div class="target-name">{{target.FriendlyName}}</div>
+            <div class="target-id text-muted">{{target.Id}}</div>
+            <div class="target-type">
+              <span class="badge" [class]="'bg-' + getControlTypeColor(target.ControlType)">
+                <i [class]="getControlTypeIcon(target.ControlType)"></i>
+                {{target.ControlType.replace('Gui', '')}}
+              </span>
+            </div>
+          </div>
+          <div class="target-actions">
+            <button class="btn btn-sm btn-outline-primary" 
+                    (click)="selectTarget(target); $event.stopPropagation()"
+                    title="Seleccionar">
+              <i class="bi bi-check"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estado vacío -->
+  <div class="empty-state text-center py-4" *ngIf="!isLoading && !error && filteredTargets.length === 0">
+    <i class="bi bi-search text-muted" style="font-size: 3rem;"></i>
+    <h6 class="text-muted mt-2">No se encontraron targets</h6>
+    <p class="text-muted">Intenta ajustar los filtros o el término de búsqueda</p>
+    <button class="btn btn-outline-primary btn-sm" (click)="clearFilters()">
+      <i class="bi bi-arrow-clockwise"></i>
+      Limpiar filtros
+    </button>
+  </div>
+
+  <!-- Footer con información -->
+  <div class="target-selector-footer" *ngIf="targets && !isLoading">
+    <div class="d-flex justify-content-between align-items-center text-muted small">
+      <span>
+        <i class="bi bi-info-circle"></i>
+        {{targets.summary.totalControls}} controles en {{targets.summary.totalGroups}} grupos
+      </span>
+      <span *ngIf="selectedTargetId">
+        <i class="bi bi-check-circle text-success"></i>
+        Target seleccionado
+      </span>
+    </div>
+  </div>
+</div> 

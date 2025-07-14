@@ -99,7 +99,8 @@ body {
 .flow-canvas {
   background: #2a3038;
   position: relative;
-  min-height: 400px;
+  min-height: 600px;
+  height: 70vh;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--bs-border-radius);
   background-image: 
@@ -112,8 +113,8 @@ body {
 
 .flow-node {
   position: absolute;
-  width: 160px;
-  min-height: 70px;
+  width: 280px;
+  min-height: 140px;
   background: #3a4750;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;

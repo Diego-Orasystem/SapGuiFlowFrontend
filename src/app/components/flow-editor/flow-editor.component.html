@@ -9,14 +9,32 @@
         <button class="btn btn-sm btn-outline-secondary me-2" (click)="toggleFullscreen()" title="Pantalla completa (F11)">
           <i class="bi" [ngClass]="isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'"></i>
         </button>
-        <button class="btn btn-sm btn-primary me-2" (click)="saveChanges()" [disabled]="flowNodes.length === 0">
-          <i class="bi bi-save me-1"></i> Guardar
+        <button class="btn btn-sm btn-primary me-2" (click)="saveChanges()" [disabled]="flowNodes.length === 0 || isSaving">
+          <span *ngIf="isSaving" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+          <i *ngIf="!isSaving" class="bi bi-save me-1"></i> 
+          {{ isSaving ? 'Guardando...' : 'Guardar' }}
         </button>
         <button class="btn btn-sm btn-outline-secondary" (click)="cancelEditing()">
           <i class="bi bi-x-circle me-1"></i> Cancelar
         </button>
       </div>
     </div>
+  </div>
+  
+  <!-- Área de mensajes de guardado -->
+  <div *ngIf="saveMessage" class="alert alert-dismissible fade show m-3 mb-0" 
+       [ngClass]="{
+         'alert-success': saveMessageType === 'success',
+         'alert-danger': saveMessageType === 'error',
+         'alert-info': saveMessageType === 'info'
+       }">
+    <i class="bi" [ngClass]="{
+      'bi-check-circle': saveMessageType === 'success',
+      'bi-exclamation-triangle': saveMessageType === 'error',
+      'bi-info-circle': saveMessageType === 'info'
+    }"></i>
+    {{ saveMessage }}
+    <button type="button" class="btn-close" (click)="saveMessage = ''" aria-label="Close"></button>
   </div>
   
   <div class="card-body p-0">
@@ -57,6 +75,54 @@
                 <button class="btn btn-sm btn-outline-secondary" (click)="autoArrangeNodes()" [disabled]="flowNodes.length === 0">
                   <i class="bi bi-grid-3x3 me-1"></i> Organizar Flujo
                 </button>
+                <button class="btn btn-sm btn-outline-success" (click)="optimizeContainerLayout()" [disabled]="flowNodes.length === 0">
+                  <i class="bi bi-bounding-box me-1"></i> Optimizar Containers
+                </button>
+                <button class="btn btn-sm btn-outline-warning" (click)="createUltraSpacedLayout()" [disabled]="flowNodes.length === 0">
+                  <i class="bi bi-arrows-fullscreen me-1"></i> Ultra Espaciado (Por Defecto)
+                </button>
+                <button class="btn btn-sm btn-outline-info" (click)="centerCanvas()" [disabled]="flowNodes.length === 0">
+                  <i class="bi bi-bullseye me-1"></i> Centrar Vista
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Control de Espaciado como acordeón -->
+          <div class="accordion-section mb-3">
+            <div class="accordion-header d-flex align-items-center justify-content-between p-2 rounded bg-light cursor-pointer" 
+                 (click)="toggleAccordion('spacing')">
+              <span class="fw-medium">Espaciado</span>
+              <i class="bi" [ngClass]="accordionState['spacing'] ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+            </div>
+            
+            <div class="accordion-body spacing-controls" [ngClass]="{'show': accordionState['spacing']}">
+              <div class="mb-3">
+                <label class="form-label small">Espaciado General: <strong>{{getCurrentSpacingLabel()}}</strong></label>
+                <div class="d-grid gap-1">
+                  <button *ngFor="let option of nodeSpacingOptions" 
+                          class="btn btn-sm btn-spacing"
+                          [ngClass]="getCurrentSpacingLabel() === option.label ? 'btn-primary active' : 'btn-outline-secondary'"
+                          (click)="changeNodeSpacing(option)"
+                          [disabled]="flowNodes.length === 0">
+                    <i class="bi bi-arrows-expand me-1"></i> {{option.label}}
+                  </button>
+                </div>
+              </div>
+              
+              <hr class="my-2">
+              
+              <div class="mb-2">
+                <label class="form-label small">Espaciado Containers: <strong>{{getCurrentContainerSpacingLabel()}}</strong></label>
+                <div class="d-grid gap-1">
+                  <button *ngFor="let option of containerSpacingOptions" 
+                          class="btn btn-sm btn-spacing"
+                          [ngClass]="getCurrentContainerSpacingLabel() === option.label ? 'btn-success active' : 'btn-outline-success'"
+                          (click)="changeContainerSpacing(option)"
+                          [disabled]="flowNodes.length === 0">
+                    <i class="bi bi-bounding-box me-1"></i> {{option.label}}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -132,44 +198,89 @@
             </div>
           </div>
           
-          <!-- Filtros por tipo de control como acordeón -->
-          <div class="accordion-section">
+          <!-- Selector de Targets como acordeón -->
+          <div class="accordion-section mb-3">
             <div class="accordion-header d-flex align-items-center justify-content-between p-2 rounded bg-light cursor-pointer" 
-                 (click)="toggleAccordion('filters')">
-              <span class="fw-medium"><i class="bi bi-funnel me-1"></i> Filtrar por ControlType</span>
-              <i class="bi" [ngClass]="accordionState['filters'] ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                 (click)="toggleAccordion('targets')">
+              <span class="fw-medium"><i class="bi bi-target me-1"></i> Selector de Targets</span>
+              <i class="bi" [ngClass]="accordionState['targets'] ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
             </div>
             
-            <div class="accordion-body" [ngClass]="{'show': accordionState['filters']}">
+            <div class="accordion-body" [ngClass]="{'show': accordionState['targets']}">
               <div>
-                <!-- Indicador de filtro activo -->
-                <div class="alert alert-info py-1 px-2 small mb-2" *ngIf="isFilterActive">
-                  <i class="bi bi-info-circle me-1"></i> Filtro activo: {{selectedControlTypes.length}} tipos seleccionados
+                <!-- Selector de Tcode -->
+                <div class="mb-3">
+                  <label class="form-label small">Tcode:</label>
+                  <select class="form-select form-select-sm" [(ngModel)]="currentTcode" (change)="changeTcode(currentTcode)">
+                    <option value="KSB1">KSB1</option>
+                    <option value="KOB1">KOB1</option>
+                    <option value="CJI3">CJI3</option>
+                    <option value="MB25">MB25</option>
+                    <option value="MB51">MB51</option>
+                    <option value="MB52">MB52</option>
+                    <option value="ME2L">ME2L</option>
+                    <option value="ME2N">ME2N</option>
+                    <option value="ME5A">ME5A</option>
+                  </select>
                 </div>
                 
-                <!-- Lista de tipos de controles -->
-                <div class="filter-list">
-                  <div *ngIf="availableControlTypes.length === 0" class="text-center text-muted small py-2">
-                    No se encontraron tipos de controles
-                  </div>
-                  
-                  <div *ngFor="let controlType of availableControlTypes" 
-                       class="form-check mb-1">
-                    <input class="form-check-input" type="checkbox" 
-                           [id]="'control-type-' + controlType"
-                           [checked]="selectedControlTypes.includes(controlType)"
-                           (change)="toggleControlTypeFilter(controlType)">
-                    <label class="form-check-label small" [for]="'control-type-' + controlType">
-                      {{controlType}}
-                    </label>
-                  </div>
-                </div>
-                
-                <!-- Botón para resetear filtros -->
-                <div class="d-grid mt-2" *ngIf="selectedControlTypes.length > 0">
-                  <button class="btn btn-sm btn-outline-secondary" (click)="resetFilters()">
-                    <i class="bi bi-x-circle me-1"></i> Limpiar filtros
+                <!-- Botones de acción -->
+                <div class="d-grid gap-2">
+                  <button class="btn btn-sm btn-outline-primary" 
+                          (click)="openTargetSelectorForNewNode(currentTcode)"
+                          [disabled]="!currentTcode">
+                    <i class="bi bi-plus-circle me-1"></i> Crear nodo con Target
                   </button>
+                  <button class="btn btn-sm btn-outline-secondary" 
+                          (click)="openTargetSelector(selectedNode!)"
+                          [disabled]="!selectedNode">
+                    <i class="bi bi-pencil me-1"></i> Editar Target del nodo
+                  </button>
+                  <button class="btn btn-sm btn-outline-info" 
+                          (click)="validateFlowTargets()"
+                          [disabled]="!currentTcode || flowNodes.length === 0">
+                    <i class="bi bi-check-circle me-1"></i> Validar Targets
+                  </button>
+                </div>
+                
+                <!-- Lista de targets disponibles -->
+                <div class="mt-3" *ngIf="currentTcode">
+                  <div class="card">
+                    <div class="card-header py-2 px-3">
+                      <div class="fw-medium small">Targets disponibles para {{currentTcode}}</div>
+                    </div>
+                    <div class="card-body p-0" style="max-height: 200px; overflow-y: auto;">
+                      <div class="list-group list-group-flush">
+                        <div class="list-group-item py-2 px-3 cursor-pointer" 
+                             *ngFor="let target of availableTargets | slice:0:10"
+                             (click)="selectTargetFromList(target)">
+                          <div class="d-flex align-items-center">
+                            <i class="bi bi-target me-2 text-primary"></i>
+                            <div class="flex-grow-1">
+                              <div class="fw-medium small">{{target.FriendlyName}}</div>
+                              <div class="text-muted small">{{target.ControlType}}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="list-group-item py-2 px-3 text-center text-muted small" 
+                             *ngIf="availableTargets.length === 0">
+                          <i class="bi bi-info-circle me-1"></i>
+                          No hay targets cargados
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Información del target seleccionado -->
+                <div class="mt-3" *ngIf="selectedTarget">
+                  <div class="alert alert-success py-2 px-3 small">
+                    <div class="fw-medium">Target seleccionado:</div>
+                    <div class="text-truncate" title="{{selectedTarget.FriendlyName}}">
+                      <i class="bi bi-target me-1"></i> {{selectedTarget.FriendlyName}}
+                    </div>
+                    <div class="text-muted small">{{selectedTarget.ControlType}}</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -236,11 +347,12 @@
             <div *ngFor="let node of filteredFlowNodes" 
                  class="flow-node shadow-sm" 
                  [class.border-primary]="selectedNode?.id === node.id"
+                 [class.container-node]="isContainerNode(node)"
                  [style.left.px]="node.x" 
                  [style.top.px]="node.y"
                  draggable="true"
                  (dragstart)="onNodeDragStart($event, node)"
-                 (click)="selectNode(node)">
+                 (click)="isContainerNode(node) ? onContainerClick($event, node) : selectNode(node)">
               <div class="node-header" [ngClass]="{'bg-primary text-white': node.type === 'action', 'bg-warning': node.type === 'decision', 'bg-info text-white': node.type === 'subflow'}">
                 <i class="bi me-1" [ngClass]="getBootstrapIcon(node.type)"></i>
                 <span class="node-label">{{node.label}}</span>
@@ -252,23 +364,67 @@
               <div class="node-content">
                 <!-- Contenido del nodo basado en su tipo -->
                 <div class="text-center small">
+                  <!-- Mostrar si es un container con sub-acciones -->
+                  <div *ngIf="isContainerNode(node)" class="mb-2">
+                    <span class="badge bg-info">
+                      <i class="bi bi-collection me-1"></i>
+                      Container ({{getContainerStepsCount(node)}} pasos)
+                    </span>
+                  </div>
+                  
+                  <!-- Mostrar acción principal -->
                   <div *ngIf="node.data?.action" class="mb-1">
                     <span class="badge" [ngClass]="{
                       'bg-success': node.data.action === 'click',
                       'bg-primary': node.data.action === 'set',
                       'bg-warning text-dark': node.data.action === 'callProgram',
                       'bg-info': node.data.action === 'callSubflow',
-                      'bg-danger': node.data.action === 'exit'
+                      'bg-danger': node.data.action === 'exit',
+                      'bg-secondary': node.data.action === 'waitFor',
+                      'bg-dark text-white': node.data.action === 'columns',
+                      'bg-purple text-white': node.data.action === 'columnsSum'
                     }">{{node.data.action}}</span>
                   </div>
-                  <div *ngIf="node.data?.target" class="text-truncate small" style="max-width: 150px;" title="{{node.data.target}}">
+                  
+                  <!-- Mostrar target -->
+                  <div *ngIf="node.data?.target" class="text-truncate small mb-1" style="max-width: 150px;" title="{{node.data.target}}">
                     <i class="bi bi-cursor me-1"></i> {{node.data.target}}
                   </div>
-                  <div *ngIf="node.data?.paramKey" class="text-truncate small text-primary" style="max-width: 150px;">
+                  
+                  <!-- Mostrar paramKey -->
+                  <div *ngIf="node.data?.paramKey" class="text-truncate small text-primary mb-1" style="max-width: 150px;">
                     <i class="bi bi-key me-1"></i> {{node.data.paramKey}}
                   </div>
+                  
+                  <!-- Mostrar timeout para waitFor -->
+                  <div *ngIf="node.data?.timeout" class="text-truncate small text-warning mb-1" style="max-width: 150px;">
+                    <i class="bi bi-clock me-1"></i> {{node.data.timeout}}
+                  </div>
+                  
+                  <!-- Mostrar operator -->
+                  <div *ngIf="node.data?.operator" class="text-truncate small text-info mb-1" style="max-width: 150px;">
+                    <i class="bi bi-toggle-on me-1"></i> {{node.data.operator}}
+                  </div>
+                  
+                  <!-- Mostrar controlType -->
                   <div *ngIf="node.data?.controlType" class="text-truncate small text-secondary mt-1" style="max-width: 150px;">
                     <i class="bi bi-tag me-1"></i> {{node.data.controlType}}
+                  </div>
+                  
+                  <!-- Mostrar próximo paso -->
+                  <div *ngIf="node.data?.next" class="text-truncate small text-muted mt-1" style="max-width: 150px;">
+                    <i class="bi bi-arrow-right me-1"></i> {{node.data.next}}
+                  </div>
+                  
+                  <!-- Indicador de sub-acciones -->
+                  <div *ngIf="hasSubActions(node)" class="mt-2">
+                    <div class="d-flex flex-wrap gap-1">
+                      <span *ngFor="let subAction of getSubActionNames(node)" 
+                            class="badge bg-light text-dark small"
+                            title="Sub-acción: {{subAction}}">
+                        {{subAction}}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -481,6 +637,48 @@
   </div>
 </div>
 
+<!-- Modal del Selector de Targets -->
+<div class="modal modal-target-selector" [class.show]="showTargetSelector" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-backdrop" *ngIf="showTargetSelector" (click)="closeTargetSelector()"></div>
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content" *ngIf="showTargetSelector">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-target me-2"></i>
+          Selector de Targets SAP - {{currentTcode}}
+          <span class="badge bg-secondary ms-2">{{targetSelectorMode === 'edit' ? 'Editar' : 'Crear'}}</span>
+        </h5>
+        <button type="button" class="btn-close" (click)="closeTargetSelector()"></button>
+      </div>
+      <div class="modal-body p-0" style="height: 70vh;">
+        <app-target-selector 
+          [tcode]="currentTcode"
+          [actionType]="selectedNode?.data?.action || ''"
+          [selectedTargetId]="selectedNode?.data?.target || ''"
+          (targetSelected)="onTargetSelected($event)"
+          (targetValidated)="onTargetValidated($event)">
+        </app-target-selector>
+      </div>
+      <div class="modal-footer">
+        <div class="me-auto text-muted small" *ngIf="selectedTarget">
+          <i class="bi bi-info-circle me-1"></i>
+          Target seleccionado: {{selectedTarget.FriendlyName}}
+        </div>
+        <button type="button" class="btn btn-secondary" (click)="closeTargetSelector()">
+          <i class="bi bi-x-circle me-1"></i>
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-primary" 
+                [disabled]="!selectedTarget"
+                (click)="selectedTarget && onTargetSelected(selectedTarget)">
+          <i class="bi bi-check-circle me-1"></i>
+          {{targetSelectorMode === 'edit' ? 'Actualizar' : 'Crear'}} Nodo
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal para ver el JSON completo -->
 <div class="modal" [class.show]="isEditing" tabindex="-1" role="dialog" aria-hidden="true">
   <div class="modal-backdrop" *ngIf="isEditing" (click)="cancelEditing()"></div>
@@ -542,8 +740,8 @@
 
 .zoom-container {
   position: absolute;
-  width: 5000px;
-  height: 5000px;
+  width: 8000px;
+  height: 8000px;
   transition: transform 0.1s ease-out;
 }
 
@@ -820,4 +1018,285 @@
     font-size: 0.7em;
   }
 }
-</style> 
+</style>
+
+<!-- Modal para editar containers -->
+<div class="modal fade modal-container-editor" [class.show]="showContainerEditor" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-backdrop" *ngIf="showContainerEditor" (click)="closeContainerEditor()"></div>
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content bg-dark text-white">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-collection me-2"></i>
+          Editar Container: {{containerBeingEdited?.label}}
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="closeContainerEditor()"></button>
+      </div>
+      <div class="modal-body">
+        <div *ngIf="containerBeingEdited" class="container-editor">
+          <!-- Información general del container -->
+          <div class="row mb-4">
+            <div class="col-md-6">
+              <div class="card bg-secondary">
+                <div class="card-header">
+                  <h6 class="mb-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Información General
+                  </h6>
+                </div>
+                <div class="card-body">
+                  <div class="mb-3">
+                    <label class="form-label">ID del Container:</label>
+                    <input type="text" class="form-control" [value]="containerBeingEdited.id" readonly>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Tipo:</label>
+                    <input type="text" class="form-control" [value]="containerBeingEdited.type" readonly>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Etiqueta:</label>
+                    <input type="text" class="form-control" [(ngModel)]="containerBeingEdited.label">
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card bg-secondary">
+                <div class="card-header">
+                  <h6 class="mb-0">
+                    <i class="bi bi-gear me-2"></i>
+                    Estadísticas
+                  </h6>
+                </div>
+                <div class="card-body">
+                  <div class="row">
+                    <div class="col-6">
+                      <div class="text-center">
+                        <div class="h4 text-primary">{{getContainerStepsCount(containerBeingEdited)}}</div>
+                        <div class="small text-muted">Sub-acciones</div>
+                      </div>
+                    </div>
+                    <div class="col-6">
+                      <div class="text-center">
+                        <div class="h4 text-success">{{getContainerSubActions(containerBeingEdited).length}}</div>
+                        <div class="small text-muted">Pasos únicos</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Lista de sub-acciones -->
+          <div class="card bg-secondary">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h6 class="mb-0">
+                <i class="bi bi-list-ul me-2"></i>
+                Sub-acciones del Container
+              </h6>
+              <button class="btn btn-sm btn-primary" (click)="addNewSubAction()">
+                <i class="bi bi-plus me-1"></i>
+                Nueva Sub-acción
+              </button>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-dark table-striped">
+                  <thead>
+                    <tr>
+                      <th>Clave</th>
+                      <th>Acción</th>
+                      <th>Target</th>
+                      <th>Parámetro</th>
+                      <th>Timeout</th>
+                      <th>Operador</th>
+                      <th>Siguiente</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let subAction of getContainerSubActions(containerBeingEdited); let i = index">
+                      <td>
+                        <span class="badge bg-primary">{{subAction.key}}</span>
+                      </td>
+                      <td>
+                        <span class="badge" [ngClass]="{
+                          'bg-success': subAction.action === 'click',
+                          'bg-info': subAction.action === 'set',
+                          'bg-warning': subAction.action === 'callProgram',
+                          'bg-danger': subAction.action === 'exit'
+                        }">{{subAction.action}}</span>
+                      </td>
+                      <td>
+                        <span class="text-truncate d-inline-block" style="max-width: 200px;" [title]="subAction.target">
+                          {{subAction.target || '-'}}
+                        </span>
+                      </td>
+                      <td>
+                        <span class="text-truncate d-inline-block" style="max-width: 150px;" [title]="subAction.paramKey">
+                          {{subAction.paramKey || '-'}}
+                        </span>
+                      </td>
+                      <td>
+                        <span class="badge bg-warning" *ngIf="subAction.timeout">{{subAction.timeout}}</span>
+                        <span *ngIf="!subAction.timeout">-</span>
+                      </td>
+                      <td>
+                        <span class="badge bg-info" *ngIf="subAction.operator">{{subAction.operator}}</span>
+                        <span *ngIf="!subAction.operator">-</span>
+                      </td>
+                      <td>
+                        <span class="text-muted">{{subAction.next || '-'}}</span>
+                      </td>
+                      <td>
+                        <div class="btn-group" role="group">
+                          <button class="btn btn-sm btn-outline-primary" (click)="editSubAction(subAction)" title="Editar">
+                            <i class="bi bi-pencil"></i>
+                          </button>
+                          <button class="btn btn-sm btn-outline-danger" (click)="deleteSubAction(subAction)" title="Eliminar">
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="text-muted small me-auto">
+          <i class="bi bi-info-circle me-1"></i>
+          Visualización detallada del container y sus sub-acciones
+        </div>
+        <button type="button" class="btn btn-outline-light" (click)="closeContainerEditor()">Cerrar</button>
+        <button type="button" class="btn btn-primary" (click)="saveContainerChanges()">
+          <i class="bi bi-check2 me-1"></i>
+          Guardar Cambios
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para editar sub-acciones -->
+<div class="modal fade modal-sub-action-editor" [class.show]="showSubActionEditor" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-backdrop" *ngIf="showSubActionEditor" (click)="cancelSubActionEdit()"></div>
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content bg-dark text-white">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-pencil-square me-2"></i>
+          Editar Sub-acción: {{editingSubAction?.key}}
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cancelSubActionEdit()"></button>
+      </div>
+      <div class="modal-body">
+        <div *ngIf="editingSubAction" class="row">
+          <!-- Información básica -->
+          <div class="col-md-6">
+            <div class="card bg-secondary mb-3">
+              <div class="card-header">
+                <h6 class="mb-0">
+                  <i class="bi bi-info-circle me-2"></i>
+                  Información Básica
+                </h6>
+              </div>
+              <div class="card-body">
+                <div class="mb-3">
+                  <label class="form-label">Clave de la Sub-acción:</label>
+                  <input type="text" class="form-control" [(ngModel)]="editingSubAction.key" placeholder="Ej: STEP_1">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Tipo de Acción:</label>
+                  <select class="form-select" [(ngModel)]="editingSubAction.action">
+                    <option *ngFor="let actionType of getAvailableActionTypes()" [value]="actionType">
+                      {{actionType}}
+                    </option>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Método:</label>
+                  <input type="text" class="form-control" [(ngModel)]="editingSubAction.method" placeholder="Ej: POST, GET">
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Target y parámetros -->
+          <div class="col-md-6">
+            <div class="card bg-secondary mb-3">
+              <div class="card-header">
+                <h6 class="mb-0">
+                  <i class="bi bi-bullseye me-2"></i>
+                  Target y Parámetros
+                </h6>
+              </div>
+              <div class="card-body">
+                <div class="mb-3">
+                  <label class="form-label">Target:</label>
+                  <div class="input-group">
+                    <input type="text" class="form-control" [(ngModel)]="editingSubAction.target" placeholder="ID del control SAP">
+                    <button class="btn btn-outline-primary" type="button" (click)="openTargetSelectorForSubAction()" title="Seleccionar Target">
+                      <i class="bi bi-search"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Parámetro (paramKey):</label>
+                  <input type="text" class="form-control" [(ngModel)]="editingSubAction.paramKey" placeholder="Valor o clave del parámetro">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Siguiente Paso:</label>
+                  <input type="text" class="form-control" [(ngModel)]="editingSubAction.next" placeholder="ID del siguiente paso">
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Configuración avanzada -->
+          <div class="col-12">
+            <div class="card bg-secondary">
+              <div class="card-header">
+                <h6 class="mb-0">
+                  <i class="bi bi-gear me-2"></i>
+                  Configuración Avanzada
+                </h6>
+              </div>
+              <div class="card-body">
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <label class="form-label">Timeout (ms):</label>
+                      <input type="number" class="form-control" [(ngModel)]="editingSubAction.timeout" placeholder="Tiempo de espera en milisegundos">
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <label class="form-label">Operador:</label>
+                      <input type="text" class="form-control" [(ngModel)]="editingSubAction.operator" placeholder="Operador de comparación">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="text-muted small me-auto">
+          <i class="bi bi-info-circle me-1"></i>
+          Configure los parámetros de la sub-acción
+        </div>
+        <button type="button" class="btn btn-outline-light" (click)="cancelSubActionEdit()">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="saveSubActionChanges()">
+          <i class="bi bi-check2 me-1"></i>
+          Guardar Cambios
+        </button>
+      </div>
+    </div>
+  </div>
+</div> 

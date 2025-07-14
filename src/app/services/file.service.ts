@@ -18,7 +18,7 @@ export interface FileInfo {
   providedIn: 'root'
 })
 export class FileService {
-  private apiUrl = 'http://10.90.0.24:3000/api/flow';
+  private apiUrl = 'http://localhost:3000/api/flow';
   
   private inputFileSubject = new BehaviorSubject<File | null>(null);
   private inputFilesSubject = new BehaviorSubject<FileInfo[]>([]);
@@ -369,8 +369,22 @@ export class FileService {
     const formData = new FormData();
     formData.append('file', file);
 
-    return this.http.post<{success: boolean, message: string, inputFiles: FileInfo[], outputFiles: FileInfo[]}>(`${this.apiUrl}/upload`, formData).pipe(
+    // Headers adicionales para compatibilidad con el servidor de producción
+    const headers = {
+      'Accept': 'application/json'
+      // No establecer Content-Type manualmente para FormData
+    };
+
+    console.log('Uploading file:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      apiUrl: this.apiUrl
+    });
+
+    return this.http.post<{success: boolean, message: string, inputFiles: FileInfo[], outputFiles: FileInfo[]}>(`${this.apiUrl}/upload`, formData, { headers }).pipe(
       map(response => {
+        console.log('Upload response:', response);
         this.inputFilesSubject.next(response.inputFiles);
         this.outputFilesSubject.next(response.outputFiles);
         if (response.inputFiles.length > 0) {
@@ -380,7 +394,13 @@ export class FileService {
       }),
       catchError(error => {
         console.error('Error processing ZIP file:', error);
-        return of([]);
+        console.error('Error details:', {
+          status: error.status,
+          statusText: error.statusText,
+          message: error.message,
+          error: error.error
+        });
+        throw error; // Re-lanzar el error para que el componente pueda manejarlo
       })
     );
   }
@@ -427,12 +447,17 @@ export class FileService {
         const outputFiles = this.outputFilesSubject.value;
         const outputIndex = outputFiles.findIndex(f => f.name === updatedFile.name);
         if (outputIndex > -1) {
+          // El archivo ya existe, actualizarlo
           outputFiles[outputIndex] = updatedFile;
           this.outputFilesSubject.next([...outputFiles]);
+        } else {
+          // El archivo no existe, añadirlo a la lista de salida
+          this.outputFilesSubject.next([...outputFiles, updatedFile]);
         }
 
-        // Actualizar archivo seleccionado
-        if (this.selectedFileSubject.value?.name === updatedFile.name) {
+        // Actualizar archivo seleccionado solo si el contenido realmente cambió
+        const currentSelected = this.selectedFileSubject.value;
+        if (currentSelected?.name === updatedFile.name && currentSelected.content !== updatedFile.content) {
           this.selectedFileSubject.next(updatedFile);
         }
       })

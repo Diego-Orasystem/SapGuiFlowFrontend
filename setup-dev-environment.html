@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuración Entorno de Desarrollo - FITS_LEK_VAULT_WS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header .subtitle {
+            color: #7f8c8d;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+        }
+
+        .vm-info {
+            background: #3498db;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            display: inline-block;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            margin-bottom: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 20px 30px;
+            font-size: 1.4em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+
+        .section-header .icon {
+            margin-right: 15px;
+            font-size: 1.5em;
+        }
+
+        .section-content {
+            padding: 30px;
+        }
+
+        .step {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+            border-radius: 0 10px 10px 0;
+        }
+
+        .step h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .step p {
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            margin: 15px 0;
+            overflow-x: auto;
+            border: 1px solid #34495e;
+        }
+
+        .code-block.powershell {
+            background: #012456;
+            border-color: #1e3a8a;
+        }
+
+        .code-block.bash {
+            background: #1a1a1a;
+            border-color: #333;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-left: 4px solid #f39c12;
+            padding: 15px 20px;
+            border-radius: 0 8px 8px 0;
+            margin: 15px 0;
+        }
+
+        .warning .icon {
+            color: #f39c12;
+            margin-right: 10px;
+        }
+
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-left: 4px solid #27ae60;
+            padding: 15px 20px;
+            border-radius: 0 8px 8px 0;
+            margin: 15px 0;
+        }
+
+        .success .icon {
+            color: #27ae60;
+            margin-right: 10px;
+        }
+
+        .url-list {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+
+        .url-list h4 {
+            color: #0c5460;
+            margin-bottom: 15px;
+        }
+
+        .url-list a {
+            color: #007bff;
+            text-decoration: none;
+            display: block;
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .url-list a:hover {
+            background: #f8f9fa;
+            text-decoration: underline;
+        }
+
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+
+        .checklist li {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            position: relative;
+            padding-left: 35px;
+        }
+
+        .checklist li:before {
+            content: "☐";
+            position: absolute;
+            left: 0;
+            color: #3498db;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .checklist li:last-child {
+            border-bottom: none;
+        }
+
+        .footer {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            color: #7f8c8d;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .highlight {
+            background: #fff3cd;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .section-content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛠️ Configuración Entorno de Desarrollo</h1>
+            <p class="subtitle">Guía completa para configurar la máquina virtual como entorno de desarrollo</p>
+            <div class="vm-info">
+                📍 FITS_LEK_VAULT_WS - IP: 10.90.0.112
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">🎯</span>
+                Objetivo y Requisitos Previos
+            </div>
+            <div class="section-content">
+                <p>Esta guía te ayudará a configurar la máquina virtual <strong>FITS_LEK_VAULT_WS (10.90.0.112)</strong> como un entorno de desarrollo completo para poder diagnosticar y arreglar problemas en las aplicaciones de las otras máquinas virtuales.</p>
+                
+                <div class="warning">
+                    <span class="icon">⚠️</span>
+                    <strong>Importante:</strong> Asegúrate de tener permisos de administrador en la máquina virtual antes de comenzar.
+                </div>
+
+                <h3>¿Qué instalaremos?</h3>
+                <ul class="checklist">
+                    <li>Git para control de versiones</li>
+                    <li>Cursor (Editor de código con IA)</li>
+                    <li>Node.js y npm</li>
+                    <li>Docker Desktop</li>
+                    <li>Windows Subsystem for Linux (WSL2)</li>
+                    <li>Herramientas de desarrollo adicionales</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">🔧</span>
+                Paso 1: Preparación del Sistema
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>1.1 Actualizar Windows</h3>
+                    <p>Primero, asegúrate de que Windows esté actualizado:</p>
+                    <div class="code-block powershell">
+# Abrir PowerShell como Administrador y ejecutar:
+Get-WindowsUpdate -Install -AcceptAll -AutoReboot</div>
+                    <p>O usar la interfaz gráfica: <span class="highlight">Configuración → Actualización y seguridad → Windows Update</span></p>
+                </div>
+
+                <div class="step">
+                    <h3>1.2 Habilitar características de Windows</h3>
+                    <p>Habilitar WSL y otras características necesarias:</p>
+                    <div class="code-block powershell">
+# Ejecutar en PowerShell como Administrador:
+dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
+dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+
+# Reiniciar el sistema después de estos comandos
+Restart-Computer</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">📥</span>
+                Paso 2: Instalación de Herramientas Principales
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>2.1 Instalar Git</h3>
+                    <div class="url-list">
+                        <h4>Descargar Git:</h4>
+                        <a href="https://git-scm.com/download/win" target="_blank">https://git-scm.com/download/win</a>
+                    </div>
+                    <p><strong>Configuración recomendada durante la instalación:</strong></p>
+                    <ul>
+                        <li>✅ Use Git from Git Bash and also from the Windows Command Prompt</li>
+                        <li>✅ Checkout Windows-style, commit Unix-style line endings</li>
+                        <li>✅ Use Windows' default console window</li>
+                        <li>✅ Enable Git Credential Manager</li>
+                    </ul>
+                    
+                    <p>Después de la instalación, configurar Git:</p>
+                    <div class="code-block bash">
+# Configurar usuario (reemplazar con tus datos)
+git config --global user.name "Tu Nombre"
+git config --global user.email "tu.email@empresa.com"
+
+# Configurar editor por defecto
+git config --global core.editor "code --wait"</div>
+                </div>
+
+                <div class="step">
+                    <h3>2.2 Instalar Node.js</h3>
+                    <div class="url-list">
+                        <h4>Descargar Node.js LTS:</h4>
+                        <a href="https://nodejs.org/es/download/" target="_blank">https://nodejs.org/es/download/</a>
+                    </div>
+                    <p>Seleccionar la versión <strong>LTS (Long Term Support)</strong> para Windows x64.</p>
+                    
+                    <p>Verificar la instalación:</p>
+                    <div class="code-block bash">
+node --version
+npm --version</div>
+                </div>
+
+                <div class="step">
+                    <h3>2.3 Instalar Cursor (Editor de código con IA)</h3>
+                    <div class="url-list">
+                        <h4>Descargar Cursor:</h4>
+                        <a href="https://cursor.sh/" target="_blank">https://cursor.sh/</a>
+                    </div>
+                    <p>Cursor es un editor de código moderno con capacidades de IA integradas, ideal para desarrollo y debugging.</p>
+                    
+                    <div class="success">
+                        <span class="icon">✅</span>
+                        <strong>Ventaja:</strong> Cursor puede ayudarte a entender y debuggear código más rápidamente con su asistente de IA.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">🐧</span>
+                Paso 3: Configurar WSL2 (Windows Subsystem for Linux)
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>3.1 Instalar WSL2</h3>
+                    <div class="code-block powershell">
+# Instalar WSL2 con Ubuntu (ejecutar como Administrador)
+wsl --install -d Ubuntu
+
+# Si ya tienes WSL instalado, actualizar a WSL2:
+wsl --set-default-version 2</div>
+                </div>
+
+                <div class="step">
+                    <h3>3.2 Configurar Ubuntu en WSL2</h3>
+                    <p>Después del reinicio, se abrirá Ubuntu automáticamente. Configurar usuario y contraseña.</p>
+                    <div class="code-block bash">
+# Actualizar el sistema
+sudo apt update && sudo apt upgrade -y
+
+# Instalar herramientas esenciales
+sudo apt install -y curl wget git build-essential</div>
+                </div>
+
+                <div class="step">
+                    <h3>3.3 Instalar Node.js en WSL2</h3>
+                    <div class="code-block bash">
+# Instalar Node Version Manager (nvm)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+
+# Reiniciar terminal o ejecutar:
+source ~/.bashrc
+
+# Instalar Node.js LTS
+nvm install --lts
+nvm use --lts</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">🐳</span>
+                Paso 4: Instalar Docker Desktop
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>4.1 Descargar e Instalar Docker Desktop</h3>
+                    <div class="url-list">
+                        <h4>Descargar Docker Desktop:</h4>
+                        <a href="https://www.docker.com/products/docker-desktop/" target="_blank">https://www.docker.com/products/docker-desktop/</a>
+                    </div>
+                    
+                    <div class="warning">
+                        <span class="icon">⚠️</span>
+                        <strong>Importante:</strong> Durante la instalación, asegúrate de marcar "Use WSL 2 instead of Hyper-V".
+                    </div>
+                </div>
+
+                <div class="step">
+                    <h3>4.2 Configurar Docker Desktop</h3>
+                    <p>Después de la instalación:</p>
+                    <ol>
+                        <li>Abrir Docker Desktop</li>
+                        <li>Ir a <strong>Settings → General</strong></li>
+                        <li>Verificar que "Use the WSL 2 based engine" esté habilitado</li>
+                        <li>Ir a <strong>Settings → Resources → WSL Integration</strong></li>
+                        <li>Habilitar integración con Ubuntu</li>
+                    </ol>
+
+                    <p>Verificar la instalación:</p>
+                    <div class="code-block bash">
+docker --version
+docker-compose --version</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">🔗</span>
+                Paso 5: Configurar Acceso a las Otras Máquinas Virtuales
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>5.1 Configurar SSH (si es necesario)</h3>
+                    <div class="code-block bash">
+# Generar clave SSH
+ssh-keygen -t rsa -b 4096 -C "dev@fits-lek-vault"
+
+# Copiar clave pública a otras máquinas (si aplica)
+ssh-copy-id usuario@10.90.0.24</div>
+                </div>
+
+                <div class="step">
+                    <h3>5.2 Configurar conexiones de red</h3>
+                    <p>Verificar conectividad con las otras máquinas:</p>
+                    <div class="code-block bash">
+# Verificar conectividad
+ping 10.90.0.24
+ping 10.90.0.25  # (si existe otra máquina)
+
+# Verificar puertos específicos
+telnet 10.90.0.24 3000
+telnet 10.90.0.24 80</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">🛠️</span>
+                Paso 6: Herramientas Adicionales de Desarrollo
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>6.1 Instalar herramientas de línea de comandos útiles</h3>
+                    <div class="code-block bash">
+# En WSL2/Ubuntu
+sudo apt install -y htop tree jq unzip zip
+
+# Instalar Angular CLI globalmente
+npm install -g @angular/cli
+
+# Instalar otras herramientas útiles
+npm install -g http-server nodemon pm2</div>
+                </div>
+
+                <div class="step">
+                    <h3>6.2 Instalar extensiones útiles para Cursor</h3>
+                    <p>Extensiones recomendadas para Cursor:</p>
+                    <ul>
+                        <li><strong>GitLens</strong> - Para mejor integración con Git</li>
+                        <li><strong>Docker</strong> - Para trabajar con contenedores</li>
+                        <li><strong>Angular Language Service</strong> - Para desarrollo Angular</li>
+                        <li><strong>ES7+ React/Redux/React-Native snippets</strong></li>
+                        <li><strong>Prettier</strong> - Para formateo de código</li>
+                        <li><strong>Thunder Client</strong> - Para testing de APIs</li>
+                    </ul>
+                </div>
+
+                <div class="step">
+                    <h3>6.3 Configurar variables de entorno</h3>
+                    <div class="code-block bash">
+# Editar archivo de perfil
+nano ~/.bashrc
+
+# Agregar al final del archivo:
+export DEVELOPMENT_MODE=true
+export API_BASE_URL="http://10.90.0.24:3000"
+export FRONTEND_URL="http://10.90.0.112:4200"
+
+# Recargar configuración
+source ~/.bashrc</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">🚀</span>
+                Paso 7: Clonar y Configurar Proyectos
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>7.1 Crear directorio de trabajo</h3>
+                    <div class="code-block bash">
+# Crear directorio para proyectos
+mkdir -p ~/desarrollo/sap-gui-projects
+cd ~/desarrollo/sap-gui-projects</div>
+                </div>
+
+                <div class="step">
+                    <h3>7.2 Clonar repositorios (ejemplo)</h3>
+                    <div class="code-block bash">
+# Clonar frontend
+git clone [URL_DEL_REPOSITORIO_FRONTEND] sap-gui-frontend
+
+# Clonar backend (si existe repositorio separado)
+git clone [URL_DEL_REPOSITORIO_BACKEND] sap-gui-backend
+
+# Entrar al directorio del frontend
+cd sap-gui-frontend
+
+# Instalar dependencias
+npm install</div>
+                </div>
+
+                <div class="step">
+                    <h3>7.3 Configurar el proyecto para desarrollo</h3>
+                    <div class="code-block bash">
+# Copiar archivos de configuración de ejemplo
+cp src/environments/environment.ts src/environments/environment.development.ts
+
+# Editar configuración de desarrollo
+nano src/environments/environment.development.ts</div>
+                    
+                    <p>Ejemplo de configuración de desarrollo:</p>
+                    <div class="code-block">
+export const environment = {
+  production: false,
+  apiUrl: 'http://10.90.0.24:3000/api',
+  debugMode: true,
+  logLevel: 'debug'
+};</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">🔍</span>
+                Paso 8: Herramientas de Debugging y Monitoreo
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>8.1 Instalar herramientas de monitoreo</h3>
+                    <div class="code-block bash">
+# Instalar herramientas de sistema
+sudo apt install -y netstat-nat iotop nethogs
+
+# Para monitorear Docker
+docker stats
+
+# Para ver logs de contenedores
+docker logs -f [CONTAINER_NAME]</div>
+                </div>
+
+                <div class="step">
+                    <h3>8.2 Configurar debugging remoto</h3>
+                    <p>Para debuggear aplicaciones en otras máquinas:</p>
+                    <div class="code-block bash">
+# Crear túnel SSH para debugging (ejemplo)
+ssh -L 9229:localhost:9229 usuario@10.90.0.24
+
+# Conectar debugger a puerto local 9229</div>
+                </div>
+
+                <div class="step">
+                    <h3>8.3 Scripts útiles para debugging</h3>
+                    <p>Crear script para verificar estado de servicios:</p>
+                    <div class="code-block bash">
+# Crear archivo check-services.sh
+nano ~/bin/check-services.sh</div>
+                    
+                    <div class="code-block bash">
+#!/bin/bash
+echo "=== Verificando servicios SAP-GUI ==="
+echo "Frontend (10.90.0.112:4200):"
+curl -s -o /dev/null -w "%{http_code}" http://10.90.0.112:4200
+
+echo -e "\nBackend (10.90.0.24:3000):"
+curl -s -o /dev/null -w "%{http_code}" http://10.90.0.24:3000
+
+echo -e "\nDocker containers:"
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+echo -e "\nDisk usage:"
+df -h
+
+echo -e "\nMemory usage:"
+free -h</div>
+                    
+                    <div class="code-block bash">
+# Hacer ejecutable
+chmod +x ~/bin/check-services.sh</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">✅</span>
+                Checklist Final y Verificación
+            </div>
+            <div class="section-content">
+                <h3>Verificar que todo esté funcionando:</h3>
+                <ul class="checklist">
+                    <li>Git instalado y configurado</li>
+                    <li>Node.js y npm funcionando</li>
+                    <li>Cursor instalado y configurado</li>
+                    <li>WSL2 con Ubuntu funcionando</li>
+                    <li>Docker Desktop funcionando</li>
+                    <li>Conectividad con otras máquinas verificada</li>
+                    <li>Proyectos clonados y dependencias instaladas</li>
+                    <li>Variables de entorno configuradas</li>
+                    <li>Scripts de debugging creados</li>
+                </ul>
+
+                <div class="step">
+                    <h3>Comandos de verificación rápida:</h3>
+                    <div class="code-block bash">
+# Verificar todas las herramientas
+echo "=== Verificación del entorno de desarrollo ==="
+echo "Git: $(git --version)"
+echo "Node.js: $(node --version)"
+echo "npm: $(npm --version)"
+echo "Docker: $(docker --version)"
+echo "WSL: $(wsl --version)"
+
+# Verificar conectividad
+ping -c 3 10.90.0.24
+curl -I http://10.90.0.24:3000</div>
+                </div>
+
+                <div class="success">
+                    <span class="icon">🎉</span>
+                    <strong>¡Perfecto!</strong> Tu entorno de desarrollo está listo. Ahora puedes diagnosticar y arreglar problemas en las aplicaciones de las otras máquinas virtuales.
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">📚</span>
+                Recursos Adicionales y Comandos Útiles
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>Comandos frecuentes para debugging:</h3>
+                    <div class="code-block bash">
+# Ver logs de aplicación Angular
+ng serve --host 0.0.0.0 --port 4200
+
+# Construir aplicación para producción
+ng build --prod
+
+# Ejecutar tests
+npm test
+
+# Ver procesos que usan un puerto específico
+sudo lsof -i :3000
+
+# Reiniciar servicios Docker
+docker-compose down && docker-compose up -d
+
+# Ver logs en tiempo real
+tail -f /var/log/app.log</div>
+                </div>
+
+                <div class="step">
+                    <h3>Enlaces útiles:</h3>
+                    <div class="url-list">
+                        <a href="https://docs.docker.com/" target="_blank">Documentación Docker</a>
+                        <a href="https://angular.io/docs" target="_blank">Documentación Angular</a>
+                        <a href="https://nodejs.org/en/docs/" target="_blank">Documentación Node.js</a>
+                        <a href="https://git-scm.com/doc" target="_blank">Documentación Git</a>
+                        <a href="https://code.visualstudio.com/docs" target="_blank">Documentación VS Code (similar a Cursor)</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Entorno de Desarrollo Configurado</strong></p>
+            <p>FITS_LEK_VAULT_WS (10.90.0.112) - Listo para desarrollo y debugging</p>
+            <p><em>Última actualización: <?php echo date('Y-m-d H:i:s'); ?></em></p>
+        </div>
+    </div>
+</body>
+</html>

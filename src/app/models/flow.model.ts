@@ -40,7 +40,7 @@ export interface SapFlow {
 export type SapActionType = 'click' | 'set' | 'callProgram' | 'callSubflow' | 'exit';
 
 // Función para convertir el flujo SAP a nuestro modelo de flujo visual
-export function convertSapFlowToVisualFlow(sapFlow: SapFlow, name: string): Flow {
+export function convertSapFlowToVisualFlow(sapFlow: any, name: string): Flow {
     const flow: Flow = {
         id: Date.now().toString(36) + Math.random().toString(36).substring(2),
         name,
@@ -51,18 +51,51 @@ export function convertSapFlowToVisualFlow(sapFlow: SapFlow, name: string): Flow
     // Posiciones iniciales para la disposición automática
     let x = 100;
     let y = 100;
-    const yOffset = 100;
+    const yOffset = 120;
     const xOffset = 200;
     
-    // Crear nodos para cada paso
-    Object.entries(sapFlow.steps).forEach(([stepId, step], index) => {
-        // Determinar el tipo de nodo basado en la acción
-        let nodeType: 'action' | 'decision' | 'subflow' = 'action';
+    // Función para detectar si un objeto es un container (tiene sub-pasos)
+    function isContainer(obj: any): boolean {
+        if (!obj || typeof obj !== 'object') return false;
         
-        if (step.action === 'callSubflow') {
+        return Object.keys(obj).some(key => 
+            typeof obj[key] === 'object' && 
+            obj[key] !== null && 
+            obj[key].action
+        );
+    }
+    
+    // Procesar el flujo - puede tener estructura 'steps' o ser directo
+    const stepsData = sapFlow.steps || sapFlow;
+    
+    // Crear nodos para cada paso
+    Object.entries(stepsData).forEach(([stepId, stepData], index) => {
+        let nodeType: 'action' | 'decision' | 'subflow' = 'action';
+        let nodeData: any = {};
+        
+        // Si es un container con sub-pasos
+        if (isContainer(stepData)) {
             nodeType = 'subflow';
-        } else if (step.action === 'exit') {
-            nodeType = 'action';
+            nodeData = stepData; // Guardar toda la estructura del container
+        } else {
+            // Es un paso simple
+            const step = stepData as SapFlowStep;
+            
+            if (step.action === 'callSubflow') {
+                nodeType = 'subflow';
+            } else if (step.action === 'exit') {
+                nodeType = 'action';
+            }
+            
+            nodeData = {
+                action: step.action,
+                target: step.target,
+                paramKey: step.paramKey,
+                method: step.method,
+                timeout: (step as any).timeout,
+                operator: (step as any).operator,
+                next: step.next
+            };
         }
         
         // Crear el nodo
@@ -72,26 +105,39 @@ export function convertSapFlowToVisualFlow(sapFlow: SapFlow, name: string): Flow
             label: stepId,
             x: x,
             y: y + (index * yOffset),
-            data: {
-                action: step.action,
-                target: step.target,
-                paramKey: step.paramKey,
-                method: step.method
-            }
+            data: nodeData
         };
         
         flow.nodes.push(node);
         
         // Crear conexión si hay un siguiente paso
-        if (step.next) {
-            const connection: Connection = {
-                id: `${stepId}-${step.next}`,
-                sourceId: stepId,
-                targetId: step.next,
-                label: ''
-            };
-            
-            flow.connections.push(connection);
+        if (!isContainer(stepData)) {
+            const step = stepData as SapFlowStep;
+            if (step.next) {
+                const connection: Connection = {
+                    id: `${stepId}-${step.next}`,
+                    sourceId: stepId,
+                    targetId: step.next,
+                    label: ''
+                };
+                
+                flow.connections.push(connection);
+            }
+        } else {
+            // Para containers, buscar conexiones en los sub-pasos
+            const containerData = stepData as any;
+            Object.values(containerData).forEach((subStep: any) => {
+                if (subStep && subStep.next && typeof subStep.next === 'string') {
+                    const connection: Connection = {
+                        id: `${stepId}-${subStep.next}`,
+                        sourceId: stepId,
+                        targetId: subStep.next,
+                        label: ''
+                    };
+                    
+                    flow.connections.push(connection);
+                }
+            });
         }
     });
     
