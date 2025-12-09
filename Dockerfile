@@ -25,8 +25,14 @@ FROM nginx:alpine
 # Copiar la configuración personalizada de nginx
 COPY nginx.conf /etc/nginx/nginx.conf
 
+# Eliminar la configuración por defecto de nginx
+RUN rm -f /etc/nginx/conf.d/default.conf
+
 # Copiar los archivos construidos desde la etapa anterior
-COPY --from=build /app/dist /usr/share/nginx/html
+COPY --from=build /app/dist/sap-gui-flow-ui /usr/share/nginx/html
+
+# Verificar que los archivos se copiaron correctamente
+RUN ls -la /usr/share/nginx/html
 
 # Exponer el puerto 80
 EXPOSE 80
