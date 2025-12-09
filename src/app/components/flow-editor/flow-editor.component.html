@@ -159,6 +159,22 @@
                       'bg-warning text-dark': control.data.action === 'callProgram'
                     }">{{control.data.action}}</span>
                   </div>
+                  
+                  <!-- Mostrar próximo paso -->
+                  <div *ngIf="node.data?.next" class="text-truncate small text-muted mt-1" style="max-width: 150px;">
+                    <i class="bi bi-arrow-right me-1"></i> {{node.data.next}}
+                  </div>
+                  
+                  <!-- Indicador de sub-acciones -->
+                  <div *ngIf="hasSubActions(node)" class="mt-2">
+                    <div class="d-flex flex-wrap gap-1">
+                      <span *ngFor="let subAction of getSubActionNames(node)" 
+                            class="badge bg-light text-dark small"
+                            title="Sub-acción: {{subAction}}">
+                        {{subAction}}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

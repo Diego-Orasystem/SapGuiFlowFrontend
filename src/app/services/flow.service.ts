@@ -168,14 +168,33 @@ export class FlowService {
       const outConnection = currentFlow.connections.find(conn => conn.sourceId === node.id);
       const nextStep = outConnection ? outConnection.targetId : undefined;
       
-      sapFlow.steps[node.id] = {
-        action: node.data?.action || this.getDefaultActionForType(node.type),
-        target: node.data?.target,
-        paramKey: node.data?.paramKey,
-        method: node.data?.method,
-        next: nextStep
+      // Crear el paso del flujo manteniendo toda la información disponible
+      const step: any = {
+        action: node.data?.action || this.getDefaultActionForType(node.type)
       };
+      
+      // Agregar propiedades solo si existen para mantener el JSON limpio
+      if (node.data?.target) step.target = node.data.target;
+      if (node.data?.paramKey) step.paramKey = node.data.paramKey;
+      if (node.data?.method) step.method = node.data.method;
+      if (node.data?.timeout) step.timeout = node.data.timeout;
+      if (node.data?.operator) step.operator = node.data.operator;
+      if (nextStep) step.next = nextStep;
+      
+      // Preservar cualquier otra propiedad que pueda existir en node.data
+      if (node.data) {
+        Object.keys(node.data).forEach(key => {
+          if (!['action', 'target', 'paramKey', 'method', 'timeout', 'operator'].includes(key)) {
+            step[key] = node.data[key];
+          }
+        });
+      }
+      
+      sapFlow.steps[node.id] = step;
     });
+    
+    // Debug: Mostrar el flujo exportado
+    console.log('Flujo exportado a SAP:', sapFlow);
     
     return sapFlow;
   }

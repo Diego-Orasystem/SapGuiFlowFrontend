@@ -5,6 +5,7 @@ import { FlowService } from '../../services/flow.service';
 import { FileService } from '../../services/file.service';
 import { SftpService } from '../../services/sftp.service';
 import { FlowNode, Connection, SapFlow } from '../../models/flow.model';
+import { TargetSelectorComponent } from '../target-selector/target-selector.component';
 import { Subscription } from 'rxjs';
 
 // Interfaz para contenedores de targets
@@ -29,7 +30,7 @@ interface TargetContainer {
   templateUrl: './flow-editor.component.html',
   styleUrls: ['./flow-editor.component.scss'],
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule]
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, TargetSelectorComponent]
 })
 export class FlowEditorComponent implements OnInit {
   @Input() jsonContent: string = '';
@@ -63,6 +64,37 @@ export class FlowEditorComponent implements OnInit {
   // Variables para organización automática
   gridSize: number = 20;
   autoArrangeMode: boolean = false;
+  
+  // Variables para control de espaciado
+  horizontalSpacing: number = 120;
+  verticalSpacing: number = 100;
+  
+  // Control de layout automático (deshabilitado para evitar problemas de rendimiento)
+  autoLayoutEnabled: boolean = false;
+  
+  // Variables para el estado de guardado
+  isSaving: boolean = false;
+  saveMessage: string = '';
+  saveMessageType: 'success' | 'error' | 'info' = 'info';
+  
+  // Bandera para prevenir reimportación durante el guardado
+  private isUpdatingFile: boolean = false;
+  private lastImportedContent: string = '';
+  nodeSpacingOptions = [
+    { label: 'Compacto', horizontal: 80, vertical: 60 },
+    { label: 'Normal', horizontal: 120, vertical: 100 },
+    { label: 'Amplio', horizontal: 160, vertical: 130 },
+    { label: 'Extra Amplio', horizontal: 200, vertical: 160 }
+  ];
+  
+  // Variables específicas para containers
+  containerSpacingMultiplier: number = 1.8;
+  containerSpacingOptions = [
+    { label: 'Compacto', multiplier: 1.3 },
+    { label: 'Normal', multiplier: 1.8 },
+    { label: 'Amplio', multiplier: 2.2 },
+    { label: 'Extra Amplio', multiplier: 2.8 }
+  ];
   
   // Variables para modo pantalla completa
   isFullscreen: boolean = false;
@@ -1349,6 +1381,7 @@ export class FlowEditorComponent implements OnInit {
   // Variables para el acordeón
   accordionState: {[key: string]: boolean} = {
     buttons: true,
+    spacing: true,
     types: true,
     filters: false,
     sapControls: false  // Añadir nuevo estado para el acordeón de controles SAP
@@ -1378,11 +1411,15 @@ export class FlowEditorComponent implements OnInit {
   controlSearchTerm: string = '';
   loadingControls = false;
   
-  // Variables para el filtro por tipo de control
-  availableControlTypes: string[] = [];
-  selectedControlTypes: string[] = [];
+  // Variables para el selector de targets
+  currentTcode: string = 'KSB1';
+  showTargetSelector: boolean = false;
+  selectedTarget: SapTarget | null = null;
+  targetSelectorMode: 'edit' | 'create' = 'edit';
+  availableTargets: SapTarget[] = [];
+  
+  // Variables para el filtro por tipo de control (eliminado)
   filteredFlowNodes: FlowNode[] = [];
-  isFilterActive: boolean = false;
   
   private subscriptions: Subscription[] = [];
   
@@ -1399,7 +1436,7 @@ export class FlowEditorComponent implements OnInit {
       this.flowService.getCurrentFlow().subscribe(flow => {
         if (flow) {
           this.flowNodes = flow.nodes;
-          this.filteredFlowNodes = [...this.flowNodes]; // Inicializar los nodos filtrados
+          this.filteredFlowNodes = [...this.flowNodes]; // Mostrar todos los nodos
           this.connections = flow.connections;
           
           // Organizar automáticamente los nodos si es la primera carga
@@ -1421,14 +1458,20 @@ export class FlowEditorComponent implements OnInit {
     // Suscribirse a cambios en el archivo seleccionado
     this.subscriptions.push(
       this.fileService.getSelectedFile().subscribe(file => {
-        if (file && file.content) {
+        if (file && file.content && !this.isUpdatingFile && file.content !== this.lastImportedContent) {
           try {
             this.currentFlowFileName = file.name; // Guardar nombre del flujo
             // importFlowFromJson ya llama a loadTargetsForCurrentFlow internamente
             this.importFlowFromJson(file.content, file.name);
+            this.lastImportedContent = file.content;
           } catch (error) {
             console.error('Error al cargar el flujo:', error);
           }
+        } else if (file && file.content) {
+          console.log('Importación omitida:', {
+            isUpdatingFile: this.isUpdatingFile,
+            contentChanged: file.content !== this.lastImportedContent
+          });
         }
       })
     );
@@ -1457,6 +1500,9 @@ export class FlowEditorComponent implements OnInit {
   ngOnDestroy(): void {
     // Cancelar todas las suscripciones al destruir el componente
     this.subscriptions.forEach(sub => sub.unsubscribe());
+    
+    // Limpiar caché
+    this.containerNodeCache.clear();
     
     // Salir del modo pantalla completa si está activo
     if (this.isFullscreen) {
@@ -1616,17 +1662,97 @@ export class FlowEditorComponent implements OnInit {
   
   saveChanges(): void {
     const jsonContent = this.exportFlowToJson();
-    if (jsonContent) {
-      this.fileService.getSelectedFile().subscribe(file => {
-        if (file) {
-          const updatedFile = {
-            ...file,
-            content: jsonContent
-          };
-          this.fileService.updateFile(updatedFile).subscribe();
-        }
-      });
+    if (!jsonContent) {
+      this.showSaveMessage('Error: No se pudo exportar el contenido JSON', 'error');
+      return;
     }
+
+    // Validar que el JSON es válido
+    try {
+      JSON.parse(jsonContent);
+    } catch (error) {
+      this.showSaveMessage('Error: El contenido JSON generado no es válido', 'error');
+      return;
+    }
+
+    // Mostrar indicador de carga
+    this.isSaving = true;
+    this.isUpdatingFile = true;
+    
+    this.fileService.getSelectedFile().subscribe({
+      next: (file) => {
+        if (!file) {
+          this.isSaving = false;
+          this.isUpdatingFile = false;
+          this.showSaveMessage('Error: No hay archivo seleccionado para guardar', 'error');
+          return;
+        }
+
+        const updatedFile = {
+          ...file,
+          content: jsonContent,
+          size: new Blob([jsonContent]).size,
+          modified: new Date()
+        };
+
+        // Debug: Mostrar datos que se envían
+        console.log('Datos enviados al backend:', {
+          name: updatedFile.name,
+          size: updatedFile.size,
+          contentPreview: jsonContent.substring(0, 200) + '...'
+        });
+
+        this.fileService.updateFile(updatedFile).subscribe({
+          next: (result) => {
+            this.isSaving = false;
+            console.log('Archivo actualizado correctamente:', result.name);
+            
+            // Mostrar mensaje de éxito
+            this.showSaveMessage('Archivo guardado exitosamente', 'success');
+            
+            // Actualizar el código del flujo mostrado
+            this.flowCode = jsonContent;
+            
+            // Restaurar la bandera después de un breve delay para permitir que se complete la actualización
+            setTimeout(() => {
+              this.isUpdatingFile = false;
+            }, 100);
+          },
+          error: (error) => {
+            this.isSaving = false;
+            this.isUpdatingFile = false;
+            console.error('Error al actualizar archivo:', error);
+            
+            // Mostrar mensaje de error más informativo
+            let errorMessage = 'Error al guardar el archivo';
+            if (error.error && error.error.error) {
+              errorMessage = `Error: ${error.error.error}`;
+            } else if (error.message) {
+              errorMessage = `Error: ${error.message}`;
+            }
+            
+            this.showSaveMessage(errorMessage, 'error');
+          }
+        });
+      },
+      error: (error) => {
+        this.isSaving = false;
+        this.isUpdatingFile = false;
+        console.error('Error al obtener archivo seleccionado:', error);
+        this.showSaveMessage('Error al obtener el archivo seleccionado', 'error');
+      }
+    });
+  }
+
+  // Método para mostrar mensajes de guardado
+  showSaveMessage(message: string, type: 'success' | 'error' | 'info'): void {
+    this.saveMessage = message;
+    this.saveMessageType = type;
+    
+    // Limpiar el mensaje después de 3 segundos
+    setTimeout(() => {
+      this.saveMessage = '';
+    }, 3000);
   }
   
   cancelEditing(): void {
@@ -1729,6 +1855,124 @@ export class FlowEditorComponent implements OnInit {
       (label as HTMLElement).style.display = this.showNodeLabels ? 'block' : 'none';
     });
   }
+
+  // Método para habilitar/deshabilitar layout automático
+  toggleAutoLayout(): void {
+    this.autoLayoutEnabled = !this.autoLayoutEnabled;
+    
+    if (this.autoLayoutEnabled && this.flowNodes.length > 0) {
+      // Aplicar layout si se habilita
+      this.createUltraSpacedLayout();
+    }
+  }
+
+  // Método simplificado para organizar nodos sin detectar containers
+  applySimpleLayout(): void {
+    if (this.flowNodes.length === 0) return;
+    
+    const spacing = 150;
+    const startX = 100;
+    const startY = 100;
+    
+    // Organizar todos los nodos en una sola columna simple
+    this.flowNodes.forEach((node, index) => {
+      node.x = startX;
+      node.y = startY + (index * spacing);
+      // No llamar updateNode para evitar problemas de rendimiento
+      // this.flowService.updateNode(node);
+    });
+    
+    // Centrar la vista
+    this.centerCanvas();
+  }
+
+  // Método muy básico para organizar nodos sin llamar servicios
+  applyBasicLayout(): void {
+    if (this.flowNodes.length === 0) return;
+    
+    const spacing = 150;
+    const startX = 100;
+    const startY = 100;
+    
+    // Organizar todos los nodos en una sola columna simple
+    this.flowNodes.forEach((node, index) => {
+      node.x = startX;
+      node.y = startY + (index * spacing);
+    });
+    
+    // No centrar la vista para evitar problemas de rendimiento
+    // this.centerCanvas();
+  }
+
+  // Método simplificado para centrar sin detectar containers
+  centerCanvasSimple(): void {
+    if (this.flowNodes.length === 0) return;
+    
+    // Usar valores fijos para evitar llamadas a isContainerNode
+    const nodeWidth = 300;
+    const nodeHeight = 150;
+    
+    // Calcular el centro de todos los nodos
+    let minX = Number.MAX_VALUE;
+    let minY = Number.MAX_VALUE;
+    let maxX = Number.MIN_VALUE;
+    let maxY = Number.MIN_VALUE;
+    
+    this.flowNodes.forEach(node => {
+      minX = Math.min(minX, node.x);
+      minY = Math.min(minY, node.y);
+      maxX = Math.max(maxX, node.x + nodeWidth);
+      maxY = Math.max(maxY, node.y + nodeHeight);
+    });
+    
+    // Calcular el centro del área de nodos
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    
+    // Obtener el tamaño del canvas
+    const canvasElement = this.elementRef.nativeElement.querySelector('.flow-canvas');
+    if (canvasElement) {
+      const canvasRect = canvasElement.getBoundingClientRect();
+      const canvasCenterX = canvasRect.width / 2;
+      const canvasCenterY = canvasRect.height / 2;
+      
+      // Calcular el offset necesario para centrar
+      this.panOffsetX = canvasCenterX - centerX;
+      this.panOffsetY = canvasCenterY - centerY;
+      
+      // Aplicar restricciones
+      this.constrainPanOffset();
+    }
+  }
+
+  // Método para aplicar ultra espaciado completo manualmente
+  applyUltraSpacedLayoutManually(): void {
+    if (this.flowNodes.length === 0) return;
+    
+    // Mostrar indicador de carga
+    console.log('Aplicando ultra espaciado...');
+    
+    // Usar setTimeout para no bloquear la UI
+    setTimeout(() => {
+      this.createUltraSpacedLayout();
+      console.log('Ultra espaciado aplicado');
+    }, 100);
+  }
+
+  // Método de emergencia - solo posicionar nodos sin hacer nada más
+  positionNodesOnly(): void {
+    if (this.flowNodes.length === 0) return;
+    
+    const spacing = 150;
+    const startX = 100;
+    const startY = 100;
+    
+    // Solo cambiar posiciones, nada más
+    this.flowNodes.forEach((node, index) => {
+      node.x = startX;
+      node.y = startY + (index * spacing);
+    });
+  }
   
   // Métodos para zoom y desplazamiento
   zoomIn(): void {
@@ -1805,6 +2049,10 @@ export class FlowEditorComponent implements OnInit {
   autoArrangeNodes(): void {
     if (this.flowNodes.length === 0) return;
     
+    // Usar layout simple para evitar problemas de rendimiento
+    this.applySimpleLayout();
+    return;
+    
     // Encontrar el nodo inicial (normalmente el que no tiene conexiones entrantes)
     const startNode = this.flowNodes.find(node => 
       !this.connections.some(conn => conn.targetId === node.id)
@@ -1838,27 +2086,76 @@ export class FlowEditorComponent implements OnInit {
     // Comenzar la asignación de niveles desde el nodo inicial
     assignLevels(startNode.id, 0);
     
-    // Posicionar los nodos según su nivel
-    const nodeWidth = 180;
-    const nodeHeight = 100;
-    const horizontalSpacing = 100;
-    const verticalSpacing = 80;
+    // Posicionar los nodos según su nivel con espaciado optimizado
+    const baseNodeWidth = 280;  
+    const baseNodeHeight = 140; 
+    const containerNodeWidth = 350;  // Ancho más amplio para containers
+    const containerNodeHeight = 180; // Altura más amplia para containers
+    const baseHorizontalSpacing = this.horizontalSpacing;
+    const baseVerticalSpacing = this.verticalSpacing;
+    const initialOffset = 200;     // Margen inicial más amplio
+    
+    // Calcular el espaciado máximo necesario para cada nivel
+    let maxLevelWidth = 0;
+    let currentY = initialOffset;
     
     Object.keys(levels).forEach(levelStr => {
       const level = parseInt(levelStr);
       const nodesInLevel = levels[level];
       
-      // Posicionar horizontalmente
-      nodesInLevel.forEach((nodeId, index) => {
+      // Separar containers de nodos regulares
+      const containerNodes: string[] = [];
+      const regularNodes: string[] = [];
+      
+      nodesInLevel.forEach(nodeId => {
+        const node = this.flowNodes.find(n => n.id === nodeId);
+        if (node && this.isContainerNode(node)) {
+          containerNodes.push(nodeId);
+        } else {
+          regularNodes.push(nodeId);
+        }
+      });
+      
+      // Calcular X position para este nivel
+      const levelWidth = containerNodes.length > 0 ? containerNodeWidth : baseNodeWidth;
+      const levelHorizontalSpacing = containerNodes.length > 0 ? 
+        baseHorizontalSpacing * this.containerSpacingMultiplier : baseHorizontalSpacing;
+      const levelX = initialOffset + level * (levelWidth + levelHorizontalSpacing);
+      
+      // Posicionar primero los nodos regulares
+      let nodeY = currentY;
+      regularNodes.forEach((nodeId, index) => {
         const node = this.flowNodes.find(n => n.id === nodeId);
         if (node) {
-          node.x = 50 + level * (nodeWidth + horizontalSpacing);
-          node.y = 50 + index * (nodeHeight + verticalSpacing);
-          
-          // Actualizar el nodo en el servicio
+          node.x = levelX;
+          node.y = nodeY;
+          nodeY += baseNodeHeight + baseVerticalSpacing;
           this.flowService.updateNode(node);
         }
       });
+      
+      // Posicionar los containers con más espacio
+      if (containerNodes.length > 0) {
+        // Agregar espacio extra antes de los containers si hay nodos regulares
+        if (regularNodes.length > 0) {
+          nodeY += baseVerticalSpacing;
+        }
+        
+        containerNodes.forEach((nodeId, index) => {
+          const node = this.flowNodes.find(n => n.id === nodeId);
+          if (node) {
+            node.x = levelX;
+            node.y = nodeY;
+            nodeY += containerNodeHeight + (baseVerticalSpacing * this.containerSpacingMultiplier);
+            this.flowService.updateNode(node);
+          }
+        });
+      }
+      
+      // Actualizar la posición Y para el próximo nivel
+      if (level === 0) {
+        currentY = Math.max(currentY, nodeY + baseVerticalSpacing);
+      }
     });
     
     // Centrar el canvas en los nodos
@@ -1878,21 +2175,229 @@ export class FlowEditorComponent implements OnInit {
     this.flowNodes.forEach(node => {
       minX = Math.min(minX, node.x);
       minY = Math.min(minY, node.y);
-      maxX = Math.max(maxX, node.x + 180); // Ancho del nodo
-      maxY = Math.max(maxY, node.y + 100); // Altura aproximada del nodo
+      
+      // Usar el tamaño específico según el tipo de nodo
+      const nodeWidth = this.isContainerNode(node) ? 350 : 280;
+      const nodeHeight = this.isContainerNode(node) ? 180 : 140;
+      
+      maxX = Math.max(maxX, node.x + nodeWidth);
+      maxY = Math.max(maxY, node.y + nodeHeight);
     });
     
-    const canvasWidth = 800; // Ancho aproximado del canvas
-    const canvasHeight = 500; // Altura aproximada del canvas
+    // Obtener dimensiones reales del canvas
+    const canvasElement = this.elementRef.nativeElement.querySelector('.flow-canvas');
+    const canvasWidth = canvasElement ? canvasElement.offsetWidth : 1000;
+    const canvasHeight = canvasElement ? canvasElement.offsetHeight : 600;
     
-    // Calcular offsets para centrar
-    this.panOffsetX = (canvasWidth - (maxX - minX)) / 2 - minX;
-    this.panOffsetY = (canvasHeight - (maxY - minY)) / 2 - minY;
+    // Calcular offsets para centrar con margen
+    const margin = 50;
+    this.panOffsetX = Math.max(margin, (canvasWidth - (maxX - minX)) / 2 - minX);
+    this.panOffsetY = Math.max(margin, (canvasHeight - (maxY - minY)) / 2 - minY);
   }
   
   // Ajustar la posición de un nodo a la cuadrícula
   snapToGrid(value: number): number {
     return Math.round(value / this.gridSize) * this.gridSize;
+  }
+  
+  // Cambiar el espaciado entre nodos
+  changeNodeSpacing(spacingOption: any): void {
+    this.horizontalSpacing = spacingOption.horizontal;
+    this.verticalSpacing = spacingOption.vertical;
+    
+    // Reorganizar automáticamente si hay nodos
+    if (this.flowNodes.length > 0) {
+      this.autoArrangeNodes();
+    }
+  }
+  
+  // Obtener el espaciado actual
+  getCurrentSpacingLabel(): string {
+    const current = this.nodeSpacingOptions.find(option => 
+      option.horizontal === this.horizontalSpacing && 
+      option.vertical === this.verticalSpacing
+    );
+    return current ? current.label : 'Personalizado';
+  }
+  
+  // Cambiar el espaciado específico para containers
+  changeContainerSpacing(spacingOption: any): void {
+    this.containerSpacingMultiplier = spacingOption.multiplier;
+    
+    // Reorganizar automáticamente si hay nodos
+    if (this.flowNodes.length > 0) {
+      this.autoArrangeNodes();
+    }
+  }
+  
+  // Obtener el espaciado actual de containers
+  getCurrentContainerSpacingLabel(): string {
+    const current = this.containerSpacingOptions.find(option => 
+      option.multiplier === this.containerSpacingMultiplier
+    );
+    return current ? current.label : 'Personalizado';
+  }
+  
+  // Optimizar el layout específicamente para containers
+  optimizeContainerLayout(): void {
+    if (this.flowNodes.length === 0) return;
+    
+    // Algoritmo especializado para containers
+    const containerNodes = this.flowNodes.filter(node => this.isContainerNode(node));
+    const regularNodes = this.flowNodes.filter(node => !this.isContainerNode(node));
+    
+    const containerWidth = 350;
+    const containerHeight = 180;
+    const regularWidth = 280;
+    const regularHeight = 140;
+    
+    const containerHSpacing = this.horizontalSpacing * 3.5;
+    const containerVSpacing = this.verticalSpacing * 3.5;
+    const regularHSpacing = this.horizontalSpacing;
+    const regularVSpacing = this.verticalSpacing;
+    
+    const startX = 250;
+    const startY = 250;
+    
+    // Organizar containers en una cuadrícula más espaciada
+    let containerX = startX;
+    let containerY = startY;
+    let containersPerRow = Math.max(1, Math.floor(containerNodes.length / 3));
+    
+    containerNodes.forEach((node, index) => {
+      node.x = containerX;
+      node.y = containerY;
+      
+      // Mover a la siguiente posición
+      if ((index + 1) % containersPerRow === 0) {
+        containerX = startX;
+        containerY += containerHeight + containerVSpacing;
+      } else {
+        containerX += containerWidth + containerHSpacing;
+      }
+      
+      this.flowService.updateNode(node);
+    });
+    
+    // Organizar nodos regulares en una columna separada
+    let regularX = startX + (containerWidth + containerHSpacing) * containersPerRow + containerHSpacing;
+    let regularY = startY;
+    
+    regularNodes.forEach((node, index) => {
+      node.x = regularX;
+      node.y = regularY;
+      regularY += regularHeight + regularVSpacing;
+      
+      this.flowService.updateNode(node);
+    });
+    
+    // Centrar la vista
+    this.centerCanvas();
+  }
+  
+  // Crear un layout ultra espaciado para máxima comodidad
+  createUltraSpacedLayout(): void {
+    if (this.flowNodes.length === 0) return;
+    
+    // Limpiar caché antes de procesar
+    this.containerNodeCache.clear();
+    
+    // Separar containers y nodos regulares de forma más eficiente
+    const containerNodes: FlowNode[] = [];
+    const regularNodes: FlowNode[] = [];
+    
+    // Clasificar nodos en una sola pasada
+    this.flowNodes.forEach(node => {
+      if (this.isContainerNode(node)) {
+        containerNodes.push(node);
+      } else {
+        regularNodes.push(node);
+      }
+    });
+    
+    const containerWidth = 350;
+    const containerHeight = 180;
+    const regularWidth = 280;
+    const regularHeight = 140;
+    
+    // Espaciado optimizado
+    const ultraHSpacing = 150;
+    const ultraVSpacing = 120;
+    
+    const startX = 100;
+    const startY = 100;
+    
+    // Organizar containers en una columna
+    let containerY = startY;
+    containerNodes.forEach((node) => {
+      node.x = startX;
+      node.y = containerY;
+      containerY += containerHeight + ultraVSpacing;
+      this.flowService.updateNode(node);
+    });
+    
+    // Organizar nodos regulares en una columna paralela
+    let regularX = startX + containerWidth + ultraHSpacing;
+    let regularY = startY;
+    regularNodes.forEach((node) => {
+      node.x = regularX;
+      node.y = regularY;
+      regularY += regularHeight + ultraVSpacing * 0.4;
+      this.flowService.updateNode(node);
+    });
+    
+    // Centrar la vista
+    this.centerCanvas();
+  }
+  
+  // Crear conexiones entre containers cuando el último paso de uno conecta con el primer paso del siguiente
+  createContainerConnections(containerNodes: FlowNode[]): void {
+    if (containerNodes.length < 2) return;
+    
+    // Crear un Set con IDs de containers para búsqueda rápida
+    const containerIds = new Set(containerNodes.map(n => n.id));
+    
+    // Limpiar conexiones existentes entre containers de forma más eficiente
+    this.connections = this.connections.filter(conn => {
+      // Solo filtrar si ambos nodos son containers
+      return !(containerIds.has(conn.sourceId) && containerIds.has(conn.targetId));
+    });
+    
+    // Crear conexiones secuenciales entre containers
+    for (let i = 0; i < containerNodes.length - 1; i++) {
+      const currentContainer = containerNodes[i];
+      const nextContainer = containerNodes[i + 1];
+      
+      // Verificar si el último paso del container actual debe conectar con el primer paso del siguiente
+      if (this.shouldConnectContainers(currentContainer, nextContainer)) {
+        const connection: Connection = {
+          id: `container-conn-${currentContainer.id}-${nextContainer.id}`,
+          sourceId: currentContainer.id,
+          targetId: nextContainer.id,
+          label: 'Flujo continuo'
+        };
+        
+        this.connections.push(connection);
+      }
+    }
+    
+    // Actualizar las conexiones en el flujo actual
+    this.flowService.getCurrentFlow().subscribe(currentFlow => {
+      if (currentFlow) {
+        currentFlow.connections = [...this.connections];
+        this.flowService.loadFlow(currentFlow);
+      }
+    });
+  }
+  
+  // Determinar si dos containers deben conectarse
+  shouldConnectContainers(currentContainer: FlowNode, nextContainer: FlowNode): boolean {
+    // Verificar que ambos nodos existan y tengan data
+    if (!currentContainer || !nextContainer) return false;
+    
+    // Simplificar la lógica para mejorar el rendimiento
+    // Solo conectar containers secuenciales por defecto
+    return true;
   }
   
   onDragStart(event: DragEvent, item: any): void {
@@ -2017,6 +2522,9 @@ export class FlowEditorComponent implements OnInit {
           type: nodeData.type as 'action' | 'decision',
           data: nodeData.data || {}
         };
+        
+        // Invalidar caché del nodo antes de actualizar
+        this.invalidateNodeCache(updatedNode.id);
         
         // Actualizar el nodo en el servicio
         this.flowService.updateNode(updatedNode);

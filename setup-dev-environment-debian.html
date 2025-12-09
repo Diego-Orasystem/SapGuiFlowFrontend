@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuración Entorno de Desarrollo - FITS_LEK_VAULT_WS (Debian)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Ubuntu', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header .subtitle {
+            color: #7f8c8d;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+        }
+
+        .vm-info {
+            background: #e74c3c;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            display: inline-block;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .debian-logo {
+            background: #d70a53;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            display: inline-block;
+            margin-left: 15px;
+            font-weight: 600;
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            margin-bottom: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-header {
+            background: linear-gradient(135deg, #2c3e50, #e74c3c);
+            color: white;
+            padding: 20px 30px;
+            font-size: 1.4em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+
+        .section-header .icon {
+            margin-right: 15px;
+            font-size: 1.5em;
+        }
+
+        .section-content {
+            padding: 30px;
+        }
+
+        .step {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-left: 4px solid #e74c3c;
+            border-radius: 0 10px 10px 0;
+        }
+
+        .step h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .step p {
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-family: 'Ubuntu Mono', 'Courier New', monospace;
+            font-size: 14px;
+            margin: 15px 0;
+            overflow-x: auto;
+            border: 1px solid #34495e;
+        }
+
+        .code-block.debian {
+            background: #8b0000;
+            border-color: #d70a53;
+        }
+
+        .code-block.bash {
+            background: #1a1a1a;
+            border-color: #333;
+        }
+
+        .code-block.sudo {
+            background: #8b4513;
+            border-color: #d2691e;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-left: 4px solid #f39c12;
+            padding: 15px 20px;
+            border-radius: 0 8px 8px 0;
+            margin: 15px 0;
+        }
+
+        .warning .icon {
+            color: #f39c12;
+            margin-right: 10px;
+        }
+
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-left: 4px solid #27ae60;
+            padding: 15px 20px;
+            border-radius: 0 8px 8px 0;
+            margin: 15px 0;
+        }
+
+        .success .icon {
+            color: #27ae60;
+            margin-right: 10px;
+        }
+
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-left: 4px solid #17a2b8;
+            padding: 15px 20px;
+            border-radius: 0 8px 8px 0;
+            margin: 15px 0;
+        }
+
+        .info .icon {
+            color: #17a2b8;
+            margin-right: 10px;
+        }
+
+        .url-list {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+
+        .url-list h4 {
+            color: #0c5460;
+            margin-bottom: 15px;
+        }
+
+        .url-list a {
+            color: #007bff;
+            text-decoration: none;
+            display: block;
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .url-list a:hover {
+            background: #f8f9fa;
+            text-decoration: underline;
+        }
+
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+
+        .checklist li {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            position: relative;
+            padding-left: 35px;
+        }
+
+        .checklist li:before {
+            content: "☐";
+            position: absolute;
+            left: 0;
+            color: #e74c3c;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .checklist li:last-child {
+            border-bottom: none;
+        }
+
+        .footer {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            color: #7f8c8d;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .highlight {
+            background: #fff3cd;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .debian-specific {
+            background: #ffeaea;
+            border: 1px solid #f5c6cb;
+            border-left: 4px solid #d70a53;
+            padding: 15px 20px;
+            border-radius: 0 8px 8px 0;
+            margin: 15px 0;
+        }
+
+        .debian-specific .icon {
+            color: #d70a53;
+            margin-right: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .section-content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐧 Configuración Entorno de Desarrollo</h1>
+            <p class="subtitle">Guía completa para configurar Debian como entorno de desarrollo</p>
+            <div class="vm-info">
+                📍 FITS_LEK_VAULT_WS - IP: 10.90.0.112
+                <span class="debian-logo">🌀 Debian Linux</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">🎯</span>
+                Objetivo y Requisitos Previos
+            </div>
+            <div class="section-content">
+                <p>Esta guía te ayudará a configurar tu sistema <strong>Debian Linux</strong> en la máquina virtual <strong>FITS_LEK_VAULT_WS (10.90.0.112)</strong> como un entorno de desarrollo completo para poder diagnosticar y arreglar problemas en las aplicaciones SAP-GUI de las otras máquinas virtuales.</p>
+                
+                <div class="debian-specific">
+                    <span class="icon">🌀</span>
+                    <strong>Específico para Debian:</strong> Esta guía está optimizada para Debian 11 (Bullseye) y Debian 12 (Bookworm). Los comandos pueden variar ligeramente en versiones anteriores.
+                </div>
+
+                <div class="warning">
+                    <span class="icon">⚠️</span>
+                    <strong>Importante:</strong> Asegúrate de tener permisos sudo en el sistema antes de comenzar.
+                </div>
+
+                <h3>¿Qué instalaremos?</h3>
+                <ul class="checklist">
+                    <li>Git para control de versiones</li>
+                    <li>Cursor (Editor de código con IA)</li>
+                    <li>Node.js y npm via Node Version Manager (nvm)</li>
+                    <li>Docker y Docker Compose</li>
+                    <li>Herramientas de desarrollo y debugging</li>
+                    <li>Herramientas de red y monitoreo</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">🔄</span>
+                Paso 1: Actualización del Sistema
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>1.1 Actualizar repositorios y paquetes</h3>
+                    <p>Primero, actualizar completamente el sistema:</p>
+                    <div class="code-block sudo">
+# Actualizar lista de paquetes
+sudo apt update
+
+# Actualizar todos los paquetes instalados
+sudo apt upgrade -y
+
+# Limpiar paquetes innecesarios
+sudo apt autoremove -y
+sudo apt autoclean</div>
+                </div>
+
+                <div class="step">
+                    <h3>1.2 Instalar paquetes esenciales</h3>
+                    <div class="code-block sudo">
+# Instalar herramientas de desarrollo básicas (comando en una línea)
+sudo apt install -y curl wget build-essential software-properties-common apt-transport-https ca-certificates gnupg lsb-release unzip zip tree htop jq vim nano
+
+# Alternativa: instalar uno por uno para mejor control
+# sudo apt install -y curl
+# sudo apt install -y wget  
+# sudo apt install -y build-essential
+# sudo apt install -y software-properties-common
+# sudo apt install -y apt-transport-https ca-certificates gnupg lsb-release
+# sudo apt install -y unzip zip tree htop jq vim nano</div>
+                </div>
+
+                <div class="step">
+                    <h3>1.3 Verificar información del sistema</h3>
+                    <div class="code-block bash">
+# Ver información del sistema
+uname -a
+lsb_release -a
+cat /etc/os-release
+
+# Ver información de hardware
+lscpu
+free -h
+df -h</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">📥</span>
+                Paso 2: Instalación de Git
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>2.1 Instalar Git</h3>
+                    <div class="code-block sudo">
+# Instalar Git (generalmente ya está incluido en Debian)
+sudo apt install -y git
+
+# Verificar instalación
+git --version</div>
+                </div>
+
+                <div class="step">
+                    <h3>2.2 Configurar Git</h3>
+                    <div class="code-block bash">
+# Configurar usuario global (reemplazar con tus datos)
+git config --global user.name "Tu Nombre"
+git config --global user.email "tu.email@empresa.com"
+
+# Configurar editor por defecto
+git config --global core.editor "nano"
+
+# Configurar comportamiento de push
+git config --global push.default simple
+
+# Ver configuración
+git config --list</div>
+                </div>
+
+                <div class="step">
+                    <h3>2.3 Generar clave SSH para Git</h3>
+                    <div class="code-block bash">
+# Generar nueva clave SSH
+ssh-keygen -t ed25519 -C "tu.email@empresa.com"
+
+# Iniciar ssh-agent
+eval "$(ssh-agent -s)"
+
+# Agregar clave al ssh-agent
+ssh-add ~/.ssh/id_ed25519
+
+# Mostrar clave pública para copiar
+cat ~/.ssh/id_ed25519.pub</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">🟢</span>
+                Paso 3: Instalación de Node.js con NVM
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>3.1 Instalar Node Version Manager (NVM)</h3>
+                    <div class="info">
+                        <span class="icon">💡</span>
+                        <strong>NVM</strong> permite gestionar múltiples versiones de Node.js fácilmente, ideal para desarrollo.
+                    </div>
+                    <div class="code-block bash">
+# Descargar e instalar NVM
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+
+# Recargar el perfil de bash
+source ~/.bashrc
+
+# Verificar instalación de NVM
+nvm --version</div>
+                </div>
+
+                <div class="step">
+                    <h3>3.2 Instalar Node.js LTS</h3>
+                    <div class="code-block bash">
+# Listar versiones disponibles
+nvm list-remote --lts
+
+# Instalar la versión LTS más reciente
+nvm install --lts
+
+# Usar la versión LTS como predeterminada
+nvm use --lts
+nvm alias default lts/*
+
+# Verificar instalación
+node --version
+npm --version</div>
+                </div>
+
+                <div class="step">
+                    <h3>3.3 Configurar npm</h3>
+                    <div class="code-block bash">
+# Actualizar npm a la última versión
+npm install -g npm@latest
+
+# Configurar npm para evitar permisos de sudo
+mkdir ~/.npm-global
+npm config set prefix '~/.npm-global'
+
+# Agregar al PATH (agregar a ~/.bashrc)
+echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
+source ~/.bashrc</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">⚡</span>
+                Paso 4: Instalación de Cursor (Editor de Código con IA)
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>4.1 Descargar e instalar Cursor</h3>
+                    <div class="url-list">
+                        <h4>Método 1: Descarga directa</h4>
+                        <a href="https://cursor.sh/" target="_blank">https://cursor.sh/</a>
+                    </div>
+                    <div class="code-block bash">
+# Descargar Cursor para Linux
+cd ~/Downloads
+wget https://downloader.cursor.sh/linux/appImage/x64 -O cursor.AppImage
+
+# Hacer ejecutable
+chmod +x cursor.AppImage
+
+# Mover a directorio de aplicaciones
+sudo mkdir -p /opt/cursor
+sudo mv cursor.AppImage /opt/cursor/
+
+# Crear enlace simbólico
+sudo ln -sf /opt/cursor/cursor.AppImage /usr/local/bin/cursor</div>
+                </div>
+
+                <div class="step">
+                    <h3>4.2 Crear acceso directo en el escritorio</h3>
+                    <div class="code-block bash">
+# Crear archivo .desktop
+cat > ~/.local/share/applications/cursor.desktop << EOF
+[Desktop Entry]
+Name=Cursor
+Comment=Code editor with AI
+Exec=/opt/cursor/cursor.AppImage
+Icon=/opt/cursor/cursor.png
+Type=Application
+Categories=Development;TextEditor;
+EOF
+
+# Hacer ejecutable
+chmod +x ~/.local/share/applications/cursor.desktop</div>
+                </div>
+
+                <div class="step">
+                    <h3>4.3 Alternativa: Usar VS Code si Cursor no está disponible</h3>
+                    <div class="code-block sudo">
+# Agregar repositorio de Microsoft
+wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
+sudo install -o root -g root -m 644 packages.microsoft.gpg /etc/apt/trusted.gpg.d/
+sudo sh -c 'echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/trusted.gpg.d/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list'
+
+# Instalar VS Code
+sudo apt update
+sudo apt install -y code</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">🐳</span>
+                Paso 5: Instalación de Docker
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>5.1 Preparar repositorio de Docker</h3>
+                    <div class="code-block sudo">
+# Agregar clave GPG oficial de Docker
+curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+# Agregar repositorio de Docker
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null</div>
+                </div>
+
+                <div class="step">
+                    <h3>5.2 Instalar Docker Engine</h3>
+                    <div class="code-block sudo">
+# Actualizar repositorios
+sudo apt update
+
+# Instalar Docker
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Iniciar y habilitar Docker
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Verificar instalación
+sudo docker --version</div>
+                </div>
+
+                <div class="step">
+                    <h3>5.3 Configurar Docker para uso sin sudo</h3>
+                    <div class="code-block bash">
+# Agregar usuario al grupo docker
+sudo usermod -aG docker $USER
+
+# Aplicar cambios (reiniciar sesión o ejecutar)
+newgrp docker
+
+# Verificar que funciona sin sudo
+docker --version
+docker ps</div>
+                </div>
+
+                <div class="step">
+                    <h3>5.4 Instalar Docker Compose (versión standalone)</h3>
+                    <div class="code-block bash">
+# Descargar Docker Compose
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+
+# Hacer ejecutable
+sudo chmod +x /usr/local/bin/docker-compose
+
+# Verificar instalación
+docker-compose --version</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">🛠️</span>
+                Paso 6: Herramientas de Desarrollo Angular
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>6.1 Instalar Angular CLI y herramientas globales</h3>
+                    <div class="code-block bash">
+# Instalar Angular CLI
+npm install -g @angular/cli
+
+# Instalar otras herramientas útiles
+npm install -g http-server nodemon pm2 typescript ts-node
+
+# Verificar instalaciones
+ng version
+http-server --version
+nodemon --version</div>
+                </div>
+
+                <div class="step">
+                    <h3>6.2 Configurar variables de entorno</h3>
+                    <div class="code-block bash">
+# Editar archivo de perfil
+nano ~/.bashrc
+
+# Agregar al final del archivo las siguientes líneas:
+export DEVELOPMENT_MODE=true
+export API_BASE_URL="http://10.90.0.24:3000"
+export FRONTEND_URL="http://10.90.0.112:4200"
+export NODE_ENV=development
+
+# Recargar configuración
+source ~/.bashrc</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">🔗</span>
+                Paso 7: Configuración de Red y Conectividad
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>7.1 Instalar herramientas de red</h3>
+                    <div class="code-block sudo">
+# Instalar herramientas de red y diagnóstico
+sudo apt install -y net-tools netstat-nat nmap telnet tcpdump iotop iftop nethogs dnsutils</div>
+                </div>
+
+                <div class="step">
+                    <h3>7.2 Verificar conectividad con otras máquinas</h3>
+                    <div class="code-block bash">
+# Verificar conectividad básica
+ping -c 3 10.90.0.24
+ping -c 3 8.8.8.8
+
+# Verificar puertos específicos
+nmap -p 3000,80,443 10.90.0.24
+telnet 10.90.0.24 3000
+
+# Ver configuración de red local
+ip addr show
+ip route show</div>
+                </div>
+
+                <div class="step">
+                    <h3>7.3 Configurar firewall (si es necesario)</h3>
+                    <div class="code-block sudo">
+# Instalar ufw (firewall simple)
+sudo apt install -y ufw
+
+# Configurar reglas básicas
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+# Permitir SSH
+sudo ufw allow ssh
+
+# Permitir puerto para desarrollo Angular
+sudo ufw allow 4200
+
+# Habilitar firewall
+sudo ufw enable
+
+# Ver estado
+sudo ufw status</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">📁</span>
+                Paso 8: Configuración del Workspace de Desarrollo
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>8.1 Crear estructura de directorios</h3>
+                    <div class="code-block bash">
+# Crear directorio principal para proyectos
+mkdir -p ~/desarrollo/sap-gui-projects
+mkdir -p ~/desarrollo/scripts
+mkdir -p ~/desarrollo/logs
+
+# Crear enlaces simbólicos útiles
+ln -sf ~/desarrollo ~/dev
+ln -sf ~/desarrollo/sap-gui-projects ~/projects
+
+# Ver estructura creada
+tree ~/desarrollo</div>
+                </div>
+
+                <div class="step">
+                    <h3>8.2 Clonar repositorios del proyecto</h3>
+                    <div class="code-block bash">
+# Navegar al directorio de proyectos
+cd ~/desarrollo/sap-gui-projects
+
+# Clonar el frontend (reemplazar con la URL real)
+# git clone <URL_DEL_REPOSITORIO> sap-gui-frontend
+
+# Ejemplo de estructura esperada:
+# git clone https://github.com/tu-org/sap-gui-frontend.git
+# cd sap-gui-frontend
+# npm install</div>
+                </div>
+
+                <div class="step">
+                    <h3>8.3 Crear scripts de utilidad</h3>
+                    <div class="code-block bash">
+# Crear script para verificar servicios
+cat > ~/desarrollo/scripts/check-services.sh << 'EOF'
+#!/bin/bash
+echo "=== Verificando servicios SAP-GUI ==="
+echo "Fecha: $(date)"
+echo ""
+
+echo "Frontend local (10.90.0.112:4200):"
+curl -s -o /dev/null -w "Status: %{http_code}\n" http://10.90.0.112:4200 || echo "No disponible"
+
+echo ""
+echo "Backend (10.90.0.24:3000):"
+curl -s -o /dev/null -w "Status: %{http_code}\n" http://10.90.0.24:3000 || echo "No disponible"
+
+echo ""
+echo "Docker containers:"
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+echo ""
+echo "Uso de recursos:"
+echo "CPU: $(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | awk -F'%' '{print $1}')%"
+echo "RAM: $(free | grep Mem | awk '{printf("%.1f%%", $3/$2 * 100.0)}')"
+echo "Disco: $(df -h / | awk 'NR==2{printf "%s", $5}')"
+EOF
+
+# Hacer ejecutable
+chmod +x ~/desarrollo/scripts/check-services.sh</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">🔍</span>
+                Paso 9: Herramientas de Debugging y Monitoreo
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>9.1 Instalar herramientas de monitoreo avanzadas</h3>
+                    <div class="code-block sudo">
+# Instalar herramientas de sistema
+sudo apt install -y htop iotop iftop nethogs ncdu glances stress-ng
+
+# Instalar herramientas de logs
+sudo apt install -y multitail ccze</div>
+                </div>
+
+                <div class="step">
+                    <h3>9.2 Configurar aliases útiles</h3>
+                    <div class="code-block bash">
+# Agregar aliases al ~/.bashrc
+cat >> ~/.bashrc << 'EOF'
+
+# Aliases para desarrollo
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+alias ..='cd ..'
+alias ...='cd ../..'
+
+# Aliases para Docker
+alias dps='docker ps'
+alias dpsa='docker ps -a'
+alias dlogs='docker logs -f'
+alias dexec='docker exec -it'
+
+# Aliases para desarrollo SAP-GUI
+alias sapdev='cd ~/desarrollo/sap-gui-projects'
+alias checkservices='~/desarrollo/scripts/check-services.sh'
+alias servefront='cd ~/desarrollo/sap-gui-projects && ng serve --host 0.0.0.0'
+
+# Aliases para monitoreo
+alias myip='ip addr show | grep inet | grep -v inet6 | grep -v 127.0.0.1'
+alias ports='netstat -tulanp'
+EOF
+
+# Recargar configuración
+source ~/.bashrc</div>
+                </div>
+
+                <div class="step">
+                    <h3>9.3 Crear script de debugging remoto</h3>
+                    <div class="code-block bash">
+# Crear script para túneles SSH
+cat > ~/desarrollo/scripts/debug-tunnel.sh << 'EOF'
+#!/bin/bash
+# Script para crear túneles SSH para debugging
+
+echo "Creando túneles SSH para debugging..."
+
+# Túnel para Node.js debugging (puerto 9229)
+ssh -L 9229:localhost:9229 -N -f user@10.90.0.24 &
+echo "Túnel Node.js debugging: localhost:9229 -> 10.90.0.24:9229"
+
+# Túnel para aplicación web (puerto 3000)
+ssh -L 3000:localhost:3000 -N -f user@10.90.0.24 &
+echo "Túnel aplicación: localhost:3000 -> 10.90.0.24:3000"
+
+echo "Túneles creados. Para cerrar, usar: pkill -f 'ssh -L'"
+EOF
+
+chmod +x ~/desarrollo/scripts/debug-tunnel.sh</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">✅</span>
+                Paso 10: Verificación Final y Testing
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>10.1 Script de verificación completa</h3>
+                    <div class="code-block bash">
+# Crear script de verificación
+cat > ~/desarrollo/scripts/verify-environment.sh << 'EOF'
+#!/bin/bash
+echo "=== Verificación del Entorno de Desarrollo ==="
+echo "Fecha: $(date)"
+echo ""
+
+echo "Sistema:"
+echo "OS: $(lsb_release -d | cut -f2)"
+echo "Kernel: $(uname -r)"
+echo "Arquitectura: $(uname -m)"
+echo ""
+
+echo "Herramientas de desarrollo:"
+echo "Git: $(git --version 2>/dev/null || echo 'No instalado')"
+echo "Node.js: $(node --version 2>/dev/null || echo 'No instalado')"
+echo "npm: $(npm --version 2>/dev/null || echo 'No instalado')"
+echo "Angular CLI: $(ng version --help 2>/dev/null | head -1 || echo 'No instalado')"
+echo "Docker: $(docker --version 2>/dev/null || echo 'No instalado')"
+echo "Docker Compose: $(docker-compose --version 2>/dev/null || echo 'No instalado')"
+echo ""
+
+echo "Editor:"
+echo "Cursor: $(which cursor 2>/dev/null && echo 'Instalado' || echo 'No encontrado')"
+echo "VS Code: $(which code 2>/dev/null && echo 'Instalado' || echo 'No encontrado')"
+echo ""
+
+echo "Conectividad:"
+ping -c 1 10.90.0.24 >/dev/null 2>&1 && echo "10.90.0.24: ✅ Accesible" || echo "10.90.0.24: ❌ No accesible"
+ping -c 1 8.8.8.8 >/dev/null 2>&1 && echo "Internet: ✅ Conectado" || echo "Internet: ❌ Sin conexión"
+echo ""
+
+echo "Servicios Docker:"
+docker ps 2>/dev/null | grep -v CONTAINER || echo "No hay contenedores ejecutándose"
+echo ""
+
+echo "Recursos del sistema:"
+echo "CPU: $(nproc) cores"
+echo "RAM: $(free -h | awk '/^Mem:/ {print $2}')"
+echo "Disco disponible: $(df -h / | awk 'NR==2{print $4}')"
+echo ""
+
+echo "=== Verificación completada ==="
+EOF
+
+chmod +x ~/desarrollo/scripts/verify-environment.sh
+
+# Ejecutar verificación
+~/desarrollo/scripts/verify-environment.sh</div>
+                </div>
+
+                <div class="step">
+                    <h3>10.2 Checklist final</h3>
+                    <ul class="checklist">
+                        <li>Sistema Debian actualizado</li>
+                        <li>Git instalado y configurado</li>
+                        <li>Node.js y npm funcionando via NVM</li>
+                        <li>Cursor o VS Code instalado</li>
+                        <li>Docker y Docker Compose operativos</li>
+                        <li>Angular CLI instalado globalmente</li>
+                        <li>Herramientas de red configuradas</li>
+                        <li>Conectividad con 10.90.0.24 verificada</li>
+                        <li>Scripts de utilidad creados</li>
+                        <li>Variables de entorno configuradas</li>
+                        <li>Aliases de desarrollo activos</li>
+                    </ul>
+                </div>
+
+                <div class="success">
+                    <span class="icon">🎉</span>
+                    <strong>¡Entorno configurado exitosamente!</strong> Tu sistema Debian está listo para desarrollo y debugging de aplicaciones SAP-GUI.
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="icon">📚</span>
+                Comandos de Referencia Rápida
+            </div>
+            <div class="section-content">
+                <div class="step">
+                    <h3>Comandos de desarrollo frecuentes:</h3>
+                    <div class="code-block bash">
+# Desarrollo Angular
+ng serve --host 0.0.0.0 --port 4200
+ng build --prod
+ng test
+
+# Docker
+docker ps
+docker logs -f container_name
+docker-compose up -d
+docker-compose down
+
+# Monitoreo del sistema
+htop                    # Monitor de procesos
+iotop                   # Monitor de I/O
+iftop                   # Monitor de red
+glances                 # Monitor general del sistema
+
+# Red y conectividad
+netstat -tuln          # Puertos abiertos
+nmap -p 1-1000 IP       # Escanear puertos
+tcpdump -i any port 80  # Capturar tráfico
+
+# Git
+git status
+git log --oneline
+git pull origin main
+git push origin feature-branch
+
+# NPM
+npm install
+npm run build
+npm run test
+npm list -g --depth=0  # Paquetes globales</div>
+                </div>
+
+                <div class="step">
+                    <h3>Enlaces útiles para Debian:</h3>
+                    <div class="url-list">
+                        <a href="https://www.debian.org/doc/" target="_blank">Documentación oficial de Debian</a>
+                        <a href="https://wiki.debian.org/" target="_blank">Wiki de Debian</a>
+                        <a href="https://docs.docker.com/engine/install/debian/" target="_blank">Docker en Debian</a>
+                        <a href="https://nodejs.org/en/docs/" target="_blank">Documentación Node.js</a>
+                        <a href="https://angular.io/docs" target="_blank">Documentación Angular</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>🐧 Entorno de Desarrollo Debian Configurado</strong></p>
+            <p>FITS_LEK_VAULT_WS (10.90.0.112) - Optimizado para desarrollo SAP-GUI</p>
+            <p><em>Guía específica para Debian Linux - Última actualización: 2024</em></p>
+        </div>
+    </div>
+</body>
+</html>
