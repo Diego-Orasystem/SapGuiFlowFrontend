@@ -7,6 +7,7 @@ import { SftpService } from '../../services/sftp.service';
 import { FlowNode, Connection, SapFlow } from '../../models/flow.model';
 import { TargetSelectorComponent } from '../target-selector/target-selector.component';
 import { Subscription } from 'rxjs';
+import { SapTarget } from '../../services/targets.service';
 
 // Interfaz para contenedores de targets
 interface TargetContainer {
@@ -843,6 +844,55 @@ export class FlowEditorComponent implements OnInit {
   }
 
   /**
+   * Verifica si un nodo es un contenedor
+   */
+  isContainerNode(node: FlowNode): boolean {
+    if (!node || !node.data) return false;
+    
+    // Verificar en caché primero
+    if (this.containerNodeCache.has(node.id)) {
+      return this.containerNodeCache.get(node.id)!;
+    }
+    
+    // Un nodo es contenedor si tiene targetContextKey en sus datos
+    const isContainer = !!(node.data.targetContextKey || node.data.containerId);
+    this.containerNodeCache.set(node.id, isContainer);
+    return isContainer;
+  }
+
+  /**
+   * Verifica si un nodo tiene sub-acciones
+   */
+  hasSubActions(node: FlowNode): boolean {
+    if (!node || !node.data) return false;
+    const subActions = node.data.subActions;
+    return Array.isArray(subActions) && subActions.length > 0;
+  }
+
+  /**
+   * Obtiene los nombres de las sub-acciones de un nodo
+   */
+  getSubActionNames(node: FlowNode): string[] {
+    if (!this.hasSubActions(node)) return [];
+    const subActions = node.data.subActions;
+    if (Array.isArray(subActions)) {
+      return subActions.map((action: any) => {
+        if (typeof action === 'string') return action;
+        if (action && typeof action === 'object' && action.name) return action.name;
+        return String(action);
+      });
+    }
+    return [];
+  }
+
+  /**
+   * Invalida el caché de un nodo específico
+   */
+  invalidateNodeCache(nodeId: string): void {
+    this.containerNodeCache.delete(nodeId);
+  }
+
+  /**
    * Selecciona un control y lo añade al canvas de targetContext dentro de un contenedor
    */
   selectControl(control: any): void {
@@ -1411,12 +1461,19 @@ export class FlowEditorComponent implements OnInit {
   controlSearchTerm: string = '';
   loadingControls = false;
   
+  // Variables para filtros de controles
+  selectedControlTypes: string[] = [];
+  availableControlTypes: string[] = [];
+  
   // Variables para el selector de targets
   currentTcode: string = 'KSB1';
   showTargetSelector: boolean = false;
   selectedTarget: SapTarget | null = null;
   targetSelectorMode: 'edit' | 'create' = 'edit';
-  availableTargets: SapTarget[] = [];
+  availableTargetsForSelector: SapTarget[] = [];
+  
+  // Cache para nodos contenedor
+  private containerNodeCache: Map<string, boolean> = new Map();
   
   // Variables para el filtro por tipo de control (eliminado)
   filteredFlowNodes: FlowNode[] = [];
