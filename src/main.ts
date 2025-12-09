@@ -9,10 +9,13 @@ import { FileSaverModule } from 'ngx-filesaver';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 
 import { AppComponent } from './app/app.component';
+import { HomeComponent } from './app/components/home/home.component';
+import { SyncPackagesComponent } from './app/components/sync-packages/sync-packages.component';
 
 const routes: Routes = [
   { path: '', redirectTo: '/home', pathMatch: 'full' },
-  { path: 'home', component: AppComponent },
+  { path: 'home', component: HomeComponent },
+  { path: 'sync-packages', component: SyncPackagesComponent },
   { path: '**', redirectTo: '/home' }
 ];
 

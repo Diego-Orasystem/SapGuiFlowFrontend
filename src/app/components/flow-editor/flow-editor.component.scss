@@ -1,75 +1,493 @@
-.editor-container {
-  background-color: white;
-  border-radius: var(--border-radius);
-  box-shadow: var(--box-shadow);
-  padding: 20px;
-  margin-bottom: 20px;
+// Estilos principales estilo Figma
+.figma-editor-container {
+  position: relative;
+  width: 100%;
+  min-height: 600px;
+  background: #1e1e1e;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   
-  h2 {
-    margin-bottom: 15px;
-    color: var(--dark-gray);
+  // Modo fullscreen
+  &.fullscreen-mode {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    border-radius: 0;
   }
 }
 
-.flow-container {
+// Barra de herramientas superior flotante
+.floating-toolbar {
+  position: relative;
+  height: 48px;
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.flow-toolbox {
-  display: flex;
-  gap: 10px;
-  padding: 15px;
-  background-color: #2a3038;
-  border-radius: var(--bs-border-radius);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.flow-element {
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 10px;
-  background-color: #3a4750;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--bs-border-radius);
-  cursor: move;
-  transition: all 0.2s ease;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border-radius: 8px 8px 0 0;
   
-  &:hover {
-    background-color: #2a3038;
-    box-shadow: var(--bs-box-shadow);
+  .fullscreen-mode & {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    border-radius: 0;
   }
-  
-  i {
-    font-size: 24px;
-    margin-bottom: 5px;
-    color: var(--bs-primary);
+
+  .toolbar-left {
+    display: flex;
+    align-items: center;
   }
-  
-  span {
-    font-size: 12px;
-    text-align: center;
-    color: #eaeaea;
+
+  .toolbar-title {
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 }
 
+// Contenedor principal del canvas
+.main-canvas-container {
+  position: relative;
+  flex: 1;
+  min-height: 600px;
+  overflow: hidden;
+  
+  .fullscreen-mode & {
+    position: absolute;
+    top: 48px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+}
+
+// Controles flotantes de zoom
+.floating-controls {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(30, 30, 30, 0.9);
+  backdrop-filter: blur(10px);
+  padding: 8px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+
+  .btn-group-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.05);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+  }
+
+  .zoom-info {
+    color: #ffffff;
+    font-size: 11px;
+    text-align: center;
+    padding: 4px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 4px;
+  }
+}
+
+// Botones flotantes para abrir/cerrar paneles
+.floating-panel-toggle {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 64px;
+  background: rgba(30, 30, 30, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0 8px 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 998;
+  transition: all 0.3s ease;
+  color: #ffffff;
+
+  &.left {
+    left: 0;
+    transition: left 0.3s ease;
+  }
+
+  &.left.active {
+    left: 320px;
+  }
+
+  &.right {
+    right: 0;
+    border-radius: 8px 0 0 8px;
+  }
+
+  &:hover {
+    background: rgba(30, 30, 30, 1);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  &.active {
+    background: rgba(13, 110, 253, 0.2);
+    border-color: rgba(13, 110, 253, 0.5);
+  }
+  
+  .fullscreen-mode & {
+    position: fixed;
+    
+    &.left {
+      left: 0;
+      
+      &.active {
+        left: 320px;
+      }
+    }
+}
+}
+
+
+
+
+
+// Paneles flotantes laterales
+.floating-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(30, 30, 30, 0.98);
+  backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.3);
+  z-index: 997;
+  transition: transform 0.3s ease;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  &.left-panel {
+    left: 0;
+    transform: translateX(-100%);
+
+    &.open {
+      transform: translateX(0);
+    }
+  }
+
+  &.right-panel {
+    right: 0;
+    border-right: none;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    transform: translateX(100%);
+
+    &.open {
+      transform: translateX(0);
+    }
+  }
+  
+  .fullscreen-mode & {
+    position: fixed;
+    top: 48px;
+    
+    &.left-panel {
+      left: 0;
+    }
+    
+    &.right-panel {
+      right: 0;
+    }
+  }
+
+  .panel-header {
+    height: 48px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(30, 30, 30, 1);
+
+    h6 {
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .btn-close {
+      color: #ffffff;
+      opacity: 0.7;
+
+      &:hover {
+        opacity: 1;
+      }
+    }
+  }
+
+  .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    color: #ffffff;
+
+    // Scrollbar personalizado
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+    }
+  }
+}
+
+// Canvas principal
 .flow-canvas {
+  width: 100%;
+  height: 100%;
   background: #2a3038;
   position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-  background-size: 20px 20px;
   overflow: auto;
-  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.05);
-  min-height: 500px;
+
+  &.dark-mode {
+    background-color: #2a3038;
+    color: #ffffff;
+  }
+
+  &.light-mode {
+    background-color: #f8f9fa;
+    color: #212529;
+  }
+
+  &.grid-visible {
+    background-image: 
+      linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  // Scrollbar personalizado
+  &::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+  }
 }
 
-.flow-node {
+.zoom-container {
+  position: absolute;
+  width: 5000px;
+  height: 5000px;
+  transition: transform 0.1s ease-out;
+}
+
+// Contenedores de targets
+.target-container {
+  position: absolute;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border: 3px solid #28a745;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
+  cursor: move;
+  z-index: 5;
+  transition: all 0.2s ease;
+  overflow: visible;
+  
+  &:hover {
+    box-shadow: 0 6px 16px rgba(40, 167, 69, 0.3);
+    transform: translateY(-2px);
+  }
+  
+  &.selected {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+  }
+  
+  // Estilos para contenedor único
+  &.container-single {
+    border-color: #6f42c1;
+    box-shadow: 0 4px 12px rgba(111, 66, 193, 0.2);
+    
+    &:hover {
+      box-shadow: 0 6px 16px rgba(111, 66, 193, 0.3);
+      
+      .container-delete-btn {
+        opacity: 1;
+      }
+    }
+  }
+  
+  // Estilos para primer contenedor
+  &.container-first {
+    border-color: #0d6efd;
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.2);
+    
+    &:hover {
+      box-shadow: 0 6px 16px rgba(13, 110, 253, 0.3);
+      
+      .container-delete-btn {
+        opacity: 1;
+      }
+    }
+  }
+  
+  // Estilos para último contenedor
+  &.container-last {
+    border-color: #dc3545;
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2);
+    
+    &:hover {
+      box-shadow: 0 6px 16px rgba(220, 53, 69, 0.3);
+      
+      .container-delete-btn {
+        opacity: 1;
+      }
+    }
+  }
+  
+  // Estilos para contenedores intermedios
+  &.container-middle {
+    border-color: #28a745;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
+    
+    &:hover {
+      box-shadow: 0 6px 16px rgba(40, 167, 69, 0.3);
+      
+      .container-delete-btn {
+        opacity: 1;
+      }
+    }
+  }
+  
+  &:hover {
+    .container-delete-btn {
+      opacity: 1;
+    }
+  }
+}
+
+.target-container-body {
+  position: relative;
+  padding: 15px;
+  min-height: 100px;
+  background: rgba(248, 249, 250, 0.5);
+  border-radius: 9px;
+}
+
+.container-delete-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 10;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(220, 53, 69, 0.9);
+  border: none;
+  opacity: 0.7;
+  transition: all 0.2s;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  span {
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    line-height: 1;
+  }
+  
+  &:hover {
+    opacity: 1;
+    background: rgba(220, 53, 69, 1);
+    transform: scale(1.1);
+  }
+}
+
+// Capa de conexiones entre contenedores
+.container-connections-layer {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.container-connection-path {
+  stroke-dasharray: none;
+  transition: stroke-dasharray 0.3s;
+}
+
+.container-connection-path:hover {
+  stroke-dasharray: 5;
+}
+
+// Nodos de control
+.control-node {
   position: absolute;
   width: 180px;
   background: white;
@@ -78,20 +496,14 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   cursor: move;
   z-index: 10;
-  transition: transform 0.2s, box-shadow 0.2s;
-  
-  &:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-    z-index: 20;
-  }
-  
+
   &.selected {
-    border: 2px solid var(--bs-primary);
-    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.25);
   }
 }
 
-.node-header {
+.control-node-header {
   padding: 8px 12px;
   background: #f8f9fa;
   border-bottom: 1px solid #dee2e6;
@@ -99,369 +511,175 @@
   display: flex;
   align-items: center;
   font-weight: 500;
-  
-  &.bg-primary, &.bg-info, &.bg-success {
-    color: white;
-  }
-  
-  &.bg-warning {
-    color: #212529;
-  }
-  
-  i {
-    margin-right: 6px;
-  }
-  
-  .btn-close {
-    font-size: 0.7rem;
-    margin-left: auto;
-    
-    &:hover {
-      background-color: rgba(0, 0, 0, 0.1);
-    }
-  }
-}
-
-.node-content {
-  padding: 10px;
-  
-  .badge {
-    font-size: 0.7rem;
-    padding: 0.25em 0.5em;
-    font-weight: 500;
-  }
-}
-
-.palette-item {
-  cursor: grab;
-  transition: all 0.2s;
-  padding: 8px;
-  border-radius: 4px;
-  background-color: #f8f9fa;
-  text-align: center;
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    background-color: #e9ecef;
-  }
-  
-  i {
-    font-size: 1.2rem;
-    display: block;
-    margin-bottom: 4px;
-    color: var(--bs-primary);
-  }
-}
-
-.connection-path {
-  stroke-dasharray: none;
-  transition: stroke-dasharray 0.3s;
-  
-  &:hover {
-    stroke-dasharray: 5;
-    stroke-width: 3;
-  }
-}
-
-// Estilos para los tipos de acciones
-.action-click {
-  color: #198754; // success
-}
-
-.action-set {
-  color: #0d6efd; // primary
-}
-
-.action-callProgram {
-  color: #ffc107; // warning
-}
-
-.action-callSubflow {
-  color: #0dcaf0; // info
-}
-
-.action-exit {
-  color: #dc3545; // danger
-}
-
-// Tooltip personalizado para las conexiones
-.connection-tooltip {
-  position: absolute;
-  background-color: rgba(0, 0, 0, 0.8);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
   font-size: 12px;
-  pointer-events: none;
-  z-index: 1000;
-  transform: translate(-50%, -100%);
-  
-  &::after {
-    content: '';
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    margin-left: -5px;
-    border-width: 5px;
-    border-style: solid;
-    border-color: rgba(0, 0, 0, 0.8) transparent transparent transparent;
-  }
 }
 
-.palette-items {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  
-  .palette-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 80px;
-    height: 80px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
-    cursor: move;
-    padding: 10px;
-    background-color: #2a3038;
-    transition: all 0.2s;
-    
-    &:hover {
-      background-color: rgba(74, 107, 223, 0.2);
-      border-color: var(--bs-primary);
-      transform: translateY(-2px);
-    }
-    
-    i {
-      font-size: 24px;
-      margin-bottom: 8px;
-      color: var(--bs-primary);
-    }
-    
-    &[data-type="action"] i {
-      color: var(--bs-primary);
-    }
-    
-    &[data-type="decision"] i {
-      color: var(--bs-info);
-    }
-    
-    &[data-type="subflow"] i {
-      color: var(--bs-success);
-    }
-  }
+.control-node-content {
+  padding: 10px;
 }
 
-.toolbar-actions {
-  .btn {
-    font-weight: 500;
-    letter-spacing: 0.01em;
-  }
+.control-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.card-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 12px 16px;
-  background-color: #2a3038;
-  
-  .fw-medium {
-    color: #eaeaea;
-  }
-}
-
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(74, 107, 223, 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(74, 107, 223, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(74, 107, 223, 0); }
-}
-
-.connections-layer {
+// Mensaje vacío
+.empty-flow-message {
   position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  max-width: 400px;
+  padding: 40px;
+  background-color: rgba(42, 48, 56, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+}
+
+// Acordeones en paneles
+.accordion-section {
+  .accordion-header {
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.1) !important;
+    }
+  }
+
+  .accordion-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+
+    &.show {
+      max-height: 2000px;
+      padding-top: 12px;
+    }
+  }
+}
+
+
+
+
+// Estilos para formularios en paneles oscuros
+.form-select,
+.form-control {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+
+  &:focus {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(13, 110, 253, 0.5);
+    color: #ffffff;
+  }
+
+  option {
+    background: #2a3038;
+    color: #ffffff;
+  }
+}
+
+.form-label {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+
+// Lista de controles
+.controls-list {
+  max-height: 400px;
+  overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+  }
+}
+
+// Modal
+.modal {
+  display: none;
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none;
-  
-  .connection-path {
-    fill: none;
-    stroke: var(--bs-primary);
-    stroke-width: 2px;
-    stroke-dasharray: none;
+  z-index: 2000;
+
+  &.show {
+    display: block;
   }
 }
 
-.properties-panel {
-  margin-top: 20px;
-  padding: 15px;
-  background-color: #2a3038;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--bs-border-radius);
-  
-  h3 {
-    margin-bottom: 15px;
-    color: #eaeaea;
-  }
-  
-  .form-group {
-    margin-bottom: 15px;
-    
-    label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: 600;
-      color: #eaeaea;
-    }
-    
-    input, select {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: var(--bs-border-radius);
-      background-color: #3a4750;
-      color: #eaeaea;
-    }
-  }
-  
-  .actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 15px;
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 1999;
+}
+
+.modal-dialog {
+  position: relative;
+  width: auto;
+  margin: 1.75rem auto;
+  z-index: 2000;
+}
+
+.json-editor-container {
+  .json-viewer {
+    width: 100%;
+    min-height: 300px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #f8f9fa;
+    background-color: #212529;
+    border: none;
+    border-radius: 0;
+    padding: 15px;
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-x: auto;
   }
 }
 
-/* Estilos para el gestor de subflujos */
-.subflujo-manager {
-  margin-bottom: 1rem;
-  
-  .subflujo-panel {
-    background-color: rgba(13, 110, 253, 0.05);
-    border-radius: 0.25rem;
-    padding: 0.75rem;
-    border: 1px solid rgba(13, 110, 253, 0.1);
-  }
-  
-  .subflujo-list {
-    max-height: 200px;
-    overflow-y: auto;
-    margin-bottom: 0.5rem;
-    
-    &::-webkit-scrollbar {
-      width: 6px;
-    }
-    
-    &::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.05);
-    }
-    
-    &::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 3px;
-    }
-  }
-  
-  .subflujo-item {
-    cursor: pointer;
-    background-color: rgba(255, 255, 255, 0.8);
-    transition: all 0.2s ease;
-    
-    &:hover {
-      background-color: rgba(13, 110, 253, 0.1);
-    }
-    
-    &.active {
-      background-color: rgba(13, 110, 253, 0.2);
-      border-left: 3px solid #0d6efd;
-    }
-    
-    .subflujo-name {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 85%;
-    }
-  }
+// Ajustes para cuando el panel izquierdo está abierto
+.floating-panel.left-panel.open ~ .main-canvas-container {
+  left: 320px;
 }
 
-/* Estilos para el acordeón */
-.accordion-section {
-  margin-bottom: 1rem;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 0.25rem;
-  
-  .accordion-header {
-    padding: 10px;
-    background-color: #f8f9fa;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    
-    &:hover {
-      background-color: #e9ecef;
-    }
-    
-    span {
-      font-weight: 500;
-    }
-  }
-  
-  .accordion-body {
-    height: 0;
-    padding: 0;
-    overflow: hidden;
-    transition: height 0.3s ease-out;
-    
-    &.show {
-      height: auto;
-      padding: 15px;
-      border-top: 1px solid rgba(0, 0, 0, 0.1);
-    }
-  }
+// Ajustar posición del botón cuando el panel está abierto
+.figma-editor-container:has(.left-panel.open) .floating-panel-toggle.left {
+  left: 320px;
 }
 
-.cursor-pointer {
-  cursor: pointer;
-}
+// Responsive
+@media (max-width: 768px) {
+  .floating-panel {
+    width: 100% !important;
+    max-width: 320px;
+  }
 
-/* Estilos para la lista de filtros */
-.filter-list {
-  max-height: 200px;
-  overflow-y: auto;
-  padding-right: 5px;
-  
-  &::-webkit-scrollbar {
-    width: 6px;
+  .floating-controls {
+    top: 56px;
+    right: 8px;
   }
-  
-  &::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.05);
-  }
-  
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 3px;
-  }
-  
-  .form-check {
-    margin-bottom: 0.5rem;
-    
-    &:last-child {
-      margin-bottom: 0;
-    }
-  }
-  
-  .form-check-input:checked {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
-  }
-  
-  .form-check-label {
-    cursor: pointer;
-    display: inline-block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    width: calc(100% - 20px);
-  }
-} 
+}

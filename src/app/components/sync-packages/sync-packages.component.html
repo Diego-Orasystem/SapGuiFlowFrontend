@@ -1,0 +1,186 @@
+<div class="container">
+  <h1>Paquetes de Sincronización</h1>
+
+  <div id="packagesContainer">
+    <div class="packages-tabs">
+      <button class="btn-add-package" (click)="showCreatePackageModalDialog()" title="Agregar nuevo paquete">+</button>
+      <div *ngFor="let pkg of packages" 
+           class="package-tab" 
+           [class.active]="currentPackageId === pkg.id">
+        <span (click)="selectPackage(pkg.id)">{{ pkg.name }}</span>
+        <button class="edit-name" (click)="renamePackage(pkg.id); $event.stopPropagation()" title="Renombrar paquete">✎</button>
+        <button class="close-btn" (click)="deletePackage(pkg.id); $event.stopPropagation()" title="Eliminar paquete">×</button>
+      </div>
+    </div>
+
+    <div class="package-content">
+      <div *ngIf="loadingPackages" class="empty-state" style="text-align: center; padding: 60px 20px;">
+        <div class="spinner" style="border: 4px solid #2a3a5c; border-top: 4px solid #4a9eff; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+        <h2 style="color: #4a9eff;">Cargando paquetes desde SFTP...</h2>
+        <p style="color: #6c757d;">Por favor espere mientras se cargan los paquetes guardados</p>
+      </div>
+      <div *ngIf="!loadingPackages && !currentPackageId" class="empty-state">
+        <h2>No hay paquetes creados</h2>
+        <p>Haz clic en el botón "+" para crear tu primer paquete de sincronización</p>
+      </div>
+
+      <div *ngIf="currentPackageId && getCurrentPackage()">
+        <div *ngIf="getCurrentPackage()!.forms.length > 0" 
+             style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: #0f1626; border-radius: 6px; border: 1px solid #2a3a5c;">
+          <div>
+            <h3 style="color: #4a9eff; margin: 0;">{{ getCurrentPackage()!.name }}</h3>
+            <p style="color: #6c757d; margin: 5px 0 0 0; font-size: 14px;">
+              {{ getCurrentPackage()!.forms.length }} formulario{{ getCurrentPackage()!.forms.length > 1 ? 's' : '' }}
+            </p>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn" style="background: #17a2b8; color: white;" (click)="savePackageToSftp(currentPackageId!)" title="Guardar paquete en servidor SFTP">
+              💾 Guardar Paquete Completo
+            </button>
+            <button class="btn" style="background: #6c757d; color: white;" (click)="undo()" title="Deshacer último cambio">
+              ↶ Deshacer
+            </button>
+          </div>
+        </div>
+
+        <div *ngIf="getCurrentPackage()!.forms.length > 0" class="forms-tabs">
+          <div *ngFor="let form of getCurrentPackage()!.forms" 
+               class="form-tab" 
+               [class.active]="currentFormId === form.id">
+            <span (click)="selectForm(form.id)">{{ form.customName }}</span>
+            <button class="edit-name" (click)="renameForm(currentPackageId!, form.id); $event.stopPropagation()" title="Renombrar">✎</button>
+            <button class="close-btn" (click)="deleteForm(currentPackageId!, form.id); $event.stopPropagation()" title="Eliminar">×</button>
+          </div>
+        </div>
+
+        <div *ngIf="getCurrentPackage()!.forms.length > 0 && getCurrentForm()">
+          <div class="form-content active">
+            <div *ngIf="getCurrentForm()!.jsonData.$meta" class="meta-info">
+              <h3>Información del TCode</h3>
+              <p><strong>TCode:</strong> {{ getCurrentForm()!.jsonData.$meta.tcode || 'N/A' }}</p>
+              <p><strong>Descripción:</strong> {{ getCurrentForm()!.jsonData.$meta.description || 'N/A' }}</p>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Formulario de Parámetros</div>
+              <div [id]="'form_' + getCurrentForm()!.id" class="form-grid"></div>
+              <div class="export-section">
+                <button class="btn btn-secondary" (click)="exportFormatted(getCurrentForm()!.id)">Exportar Formato Legible</button>
+                <button class="btn btn-secondary" (click)="exportCSV(getCurrentForm()!.id)">Exportar CSV</button>
+                <button class="btn" style="background: #6c757d; color: white;" (click)="undo()" title="Deshacer último cambio">
+                  ↶ Deshacer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div [style.margin-top.px]="getCurrentPackage()!.forms.length > 0 ? 30 : 0" 
+             [style.padding-top.px]="getCurrentPackage()!.forms.length > 0 ? 30 : 0"
+             [style.border-top]="getCurrentPackage()!.forms.length > 0 ? '2px solid #2a3a5c' : 'none'">
+          <div *ngIf="getCurrentPackage()!.forms.length > 0" class="section-title">Agregar Nuevo Formulario</div>
+          
+          <div class="json-upload-area" 
+               [id]="'jsonUploadArea_' + currentPackageId"
+               [style.padding.px]="getCurrentPackage()!.forms.length > 0 ? 30 : 50"
+               (click)="openFileDialog(currentPackageId!)">
+            <div class="upload-icon" [style.font-size.px]="getCurrentPackage()!.forms.length > 0 ? 40 : 64">📁</div>
+            <div class="upload-text" [style.font-size.px]="getCurrentPackage()!.forms.length > 0 ? 16 : 18">
+              Haz clic para seleccionar un archivo JSON desde el servidor SFTP
+            </div>
+            <div *ngIf="getCurrentPackage()!.forms.length === 0" class="upload-hint">
+              Los archivos se cargan desde: ~/lek-files/can/sap-config/sap-gui-flow$
+            </div>
+          </div>
+
+          <div [id]="'jsonPreview_' + currentPackageId" class="json-preview hidden"></div>
+          <div class="form-actions-bar" [id]="'formActions_' + currentPackageId" style="display: none;">
+            <input type="text" 
+                   [id]="'formCustomName_' + currentPackageId" 
+                   placeholder="Nombre personalizado (opcional)" 
+                   style="flex: 1; margin-right: 10px;" />
+            <button class="btn btn-success" (click)="createFormFromPreview(currentPackageId!)">Crear Formulario</button>
+            <button class="btn btn-secondary" (click)="clearJsonPreview(currentPackageId!)">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="messageArea"></div>
+</div>
+
+<!-- Modal para crear paquete -->
+<div id="createPackageModal" 
+     class="modal" 
+     [class.active]="showCreatePackageModal"
+     (click)="onModalClick($event)">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">Crear Paquete de Sincronización</div>
+    <div class="input-group">
+      <label for="packageName">Nombre del Paquete:</label>
+      <input type="text" 
+             id="packageName" 
+             [(ngModel)]="packageName"
+             placeholder="Ej: Sincronización SAP Finanzas"
+             (keyup.enter)="createPackage()" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" (click)="closeCreatePackageModal()">Cancelar</button>
+      <button class="btn btn-success" (click)="createPackage()">Crear</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para seleccionar archivo JSON desde SFTP -->
+<div id="fileSelectorModal" 
+     class="modal" 
+     [class.active]="showFileSelectorModal"
+     (click)="closeFileSelectorModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()" style="max-width: 800px;">
+    <div class="modal-header">Seleccionar Archivo JSON desde SFTP</div>
+    <div class="input-group">
+      <p style="color: #b0c4de; margin-bottom: 15px;">
+        <strong>Directorio:</strong> ~/lek-files/can/sap-config/sap-gui-flow$
+      </p>
+      
+      <div *ngIf="loadingFiles" class="loading-container" style="text-align: center; padding: 40px;">
+        <div class="spinner" style="border: 4px solid #2a3a5c; border-top: 4px solid #4a9eff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+        <p style="color: #b0c4de; margin-top: 15px;">Cargando archivos desde SFTP...</p>
+      </div>
+
+      <div *ngIf="!loadingFiles && availableJsonFiles.length > 0" class="file-list-container" style="max-height: 400px; overflow-y: auto;">
+        <div *ngFor="let file of availableJsonFiles" 
+             class="file-item" 
+             (click)="selectJsonFileFromSftp(file)"
+             style="padding: 15px; margin-bottom: 10px; background: #0f1626; border: 1px solid #2a3a5c; border-radius: 6px; cursor: pointer; transition: all 0.3s;">
+          <div style="display: flex; align-items: center; gap: 15px;">
+            <div style="font-size: 32px;">📄</div>
+            <div style="flex: 1;">
+              <div style="color: #4a9eff; font-weight: 600; margin-bottom: 5px;">{{ file.name }}</div>
+              <div style="color: #6c757d; font-size: 12px;">
+                <span>Tamaño: {{ formatFileSize(file.size) }}</span>
+                <span style="margin-left: 15px;">Modificado: {{ formatDate(file.modifiedDate) }}</span>
+              </div>
+              <div style="color: #6c757d; font-size: 11px; margin-top: 5px; font-family: monospace;">
+                {{ file.path }}
+              </div>
+            </div>
+            <div style="color: #4a9eff; font-size: 24px;">→</div>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="!loadingFiles && availableJsonFiles.length === 0" class="empty-state" style="text-align: center; padding: 40px; color: #6c757d;">
+        <p>No se encontraron archivos JSON en el servidor SFTP.</p>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" (click)="closeFileSelectorModal()">Cancelar</button>
+      <button class="btn btn-secondary" (click)="loadJsonFilesFromSftp()" [disabled]="loadingFiles">
+        <span *ngIf="!loadingFiles">🔄</span> Actualizar Lista
+      </button>
+    </div>
+  </div>
+</div>
+

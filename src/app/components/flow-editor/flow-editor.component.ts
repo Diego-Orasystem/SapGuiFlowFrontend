@@ -3,8 +3,26 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { FlowService } from '../../services/flow.service';
 import { FileService } from '../../services/file.service';
+import { SftpService } from '../../services/sftp.service';
 import { FlowNode, Connection, SapFlow } from '../../models/flow.model';
 import { Subscription } from 'rxjs';
+
+// Interfaz para contenedores de targets
+interface TargetContainer {
+  id: string;
+  targetContextKey: string; // Clave base del contexto (ej: "SCAREA")
+  instanceNumber: number; // Número de instancia (1, 2, 3, ...)
+  fullKey: string; // Clave completa con instancia (ej: "SCAREA::1")
+  friendlyName: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  controls: FlowNode[];
+  isCollapsed?: boolean;
+  colorClass?: string; // Clase CSS para el color del contenedor
+  nextContainerId?: string; // ID del siguiente contenedor en el flujo
+}
 
 @Component({
   selector: 'app-flow-editor',
@@ -50,7 +68,14 @@ export class FlowEditorComponent implements OnInit {
   isFullscreen: boolean = false;
   originalHeight: string = '500px';
   fullscreenHeight: string = '100vh';
-  canvasHeight: string = '500px';
+  canvasHeight: string = '600px'; // Altura inicial del canvas
+  
+  // Variables para paneles flotantes (estilo Figma)
+  showLeftPanel: boolean = true; // Panel izquierdo (Controles SAP) - abierto por defecto
+  showRightPanel: boolean = false; // Panel derecho (propiedades/configuración)
+  leftPanelWidth: number = 320; // Ancho del panel izquierdo
+  rightPanelWidth: number = 320; // Ancho del panel derecho
+  showGrid: boolean = false; // Variable para controlar la visibilidad de la cuadrícula
   
   // Variables para modo oscuro/claro y configuración de visualización
   isDarkMode: boolean = true;
@@ -59,32 +84,1299 @@ export class FlowEditorComponent implements OnInit {
   
   flowElements = [
     { type: 'action', label: 'Acción', icon: 'bi-play-circle' },
-    { type: 'decision', label: 'Decisión', icon: 'bi-diamond' },
-    { type: 'subflow', label: 'Subflujo', icon: 'bi-diagram-3' }
+    { type: 'decision', label: 'Decisión', icon: 'bi-diamond' }
   ];
   
   flowNodes: FlowNode[] = [];
+  targetContextNodes: FlowNode[] = [];
+  targetContainers: TargetContainer[] = [];
   connections: Connection[] = [];
+  containerConnections: Array<{ sourceId: string; targetId: string }> = []; // Conexiones entre contenedores
   selectedNode: FlowNode | null = null;
+  selectedTargetContextNode: FlowNode | null = null;
+  selectedContainer: TargetContainer | null = null;
   isDragging = false;
+  isDraggingContainer = false;
+  dragContainerOffset = { x: 0, y: 0 };
   
-  // Variables para el gestor de subflujos
-  showSubflowManager: boolean = false;
-  subflowSearchTerm: string = '';
-  filteredSubflows: FlowNode[] = [];
-  selectedSubflow: FlowNode | null = null;
+  // Variables para pestañas
+  activeTab: 'steps' | 'targetContext' = 'targetContext'; // TEMPORALMENTE: Cambiado a 'targetContext' porque la pestaña Steps está comentada
+  flowData: any = null;
+  stepsData: any = null;
+  targetContextData: any = null;
+  targetContextAccordionState: { [key: number]: boolean } = {};
+  currentFlowFileName: string = ''; // Nombre del flujo actual cargado
+
+  // Métodos para TargetContext
+  getTargetContextKeys(): string[] {
+    if (!this.targetContextData) return [];
+    return Object.keys(this.targetContextData);
+  }
+
+  getTargetContextCount(): number {
+    if (!this.targetContextData) return 0;
+    return Object.keys(this.targetContextData).length;
+  }
+
+  getTargetContextFriendlyName(contextKey: string): string | null {
+    if (!this.targetContextData || !this.targetContextData[contextKey]) return null;
+    const context = this.targetContextData[contextKey];
+    if (typeof context === 'object' && context.FriendlyName) {
+      return context.FriendlyName;
+    }
+    return null;
+  }
+
+  isTargetContextString(contextKey: string): boolean {
+    if (!this.targetContextData || !this.targetContextData[contextKey]) return false;
+    return typeof this.targetContextData[contextKey] === 'string';
+  }
+
+  getTargetContextValue(contextKey: string): string {
+    if (!this.targetContextData || !this.targetContextData[contextKey]) return '';
+    return this.targetContextData[contextKey];
+  }
+
+  getTargetContextDeepAliases(contextKey: string): any {
+    if (!this.targetContextData || !this.targetContextData[contextKey]) return null;
+    const context = this.targetContextData[contextKey];
+    if (typeof context === 'object' && context.deepaliases) {
+      return context.deepaliases;
+    }
+    return null;
+  }
+
+  getTargetContextDeepAliasesKeys(contextKey: string): string[] {
+    const aliases = this.getTargetContextDeepAliases(contextKey);
+    if (!aliases) return [];
+    return Object.keys(aliases);
+  }
+
+  getTargetContextDeepAliasValue(contextKey: string, alias: string): string {
+    const aliases = this.getTargetContextDeepAliases(contextKey);
+    if (!aliases || !aliases[alias]) return '';
+    return aliases[alias];
+  }
+
+  getTargetContextTargetMap(contextKey: string): any {
+    if (!this.targetContextData || !this.targetContextData[contextKey]) return null;
+    const context = this.targetContextData[contextKey];
+    if (typeof context === 'object' && context.targetMap) {
+      return context.targetMap;
+    }
+    return null;
+  }
+
+  getTargetContextTargetMapKeys(contextKey: string): string[] {
+    const targetMap = this.getTargetContextTargetMap(contextKey);
+    if (!targetMap) return [];
+    return Object.keys(targetMap);
+  }
+
+  getTargetContextTargetMapValue(contextKey: string, mapKey: string): string {
+    const targetMap = this.getTargetContextTargetMap(contextKey);
+    if (!targetMap || !targetMap[mapKey]) return '';
+    return targetMap[mapKey];
+  }
+
+  /**
+   * Toggle del acordeón de TargetContext
+   */
+  toggleTargetContextAccordion(index: number): void {
+    this.targetContextAccordionState[index] = !this.targetContextAccordionState[index];
+  }
+
+  /**
+   * Verifica si un item del acordeón está abierto
+   */
+  isTargetContextAccordionOpen(index: number): boolean {
+    // Por defecto, el primer item está abierto
+    if (index === 0 && this.targetContextAccordionState[index] === undefined) {
+      return true;
+    }
+    return this.targetContextAccordionState[index] === true;
+  }
+
+  /**
+   * Obtiene los targetContext disponibles desde SFTP
+   */
+  getAvailableTargetContexts(): Array<{ key: string; friendlyName: string; path?: string; flowContextKey?: string }> {
+    console.log('getAvailableTargetContexts llamado. availableTargets:', this.availableTargets.map(t => ({ key: t.key, friendlyName: t.friendlyName })));
+    return this.availableTargets;
+  }
+
+  /**
+   * Obtiene el tooltip para un target context
+   */
+  getTargetContextTooltip(context: { key: string; friendlyName: string; path?: string; flowContextKey?: string }): string {
+    // Mostrar el flowContextKey si está disponible (es el ID real del target context en el flujo)
+    // Si no, mostrar el key
+    const id = context.flowContextKey || context.key;
+    return `ID: ${id}`;
+  }
+
+  /**
+   * Carga los targets disponibles desde SFTP (todos los targets)
+   * NOTA: Este método carga los targets inicialmente. Cuando se carga un flujo específico,
+   * loadTargetsForCurrentFlow sobrescribirá estos targets con los FriendlyName correctos.
+   */
+  loadTargetsFromSftp(): void {
+    this.loadingTargets = true;
+    this.availableTargets = [];
+
+    this.sftpService.listTargets().subscribe({
+      next: (response) => {
+        this.loadingTargets = false;
+        if (response.status && response.files) {
+          // Procesar archivos JSON de targets
+          // Inicialmente usar el nombre del archivo como clave
+          // Cuando se cargue un flujo específico, estos se sobrescribirán con FriendlyName
+          this.availableTargets = response.files
+            .filter(file => !file.isDirectory && file.name.endsWith('.json'))
+            .map(file => {
+              // Extraer el nombre base del target (sin -targets.json)
+              // Ejemplo: "CJI3-targets.json" -> "CJI3"
+              const key = file.name.replace('-targets.json', '').replace('.json', '');
+              return {
+                key: key,
+                friendlyName: key, // Se actualizará cuando se cargue el contenido o se cargue un flujo
+                path: file.path
+              };
+            });
+          
+          // Cargar contenido de cada target para obtener FriendlyName (solo si no hay flujo cargado)
+          // Si hay un flujo cargado, los targets se cargarán desde loadTargetsForCurrentFlow
+          if (!this.currentFlowFileName) {
+            this.loadTargetsMetadata();
+          }
+        } else {
+          console.error('Error al cargar targets:', response.message);
+        }
+      },
+      error: (error) => {
+        this.loadingTargets = false;
+        console.error('Error al cargar targets desde SFTP:', error);
+      }
+    });
+  }
+
+  /**
+   * Carga los targets correspondientes al flujo actual
+   * Ejemplo: flujo "cji3.json" -> targets "CJI3-targets.json"
+   */
+  loadTargetsForCurrentFlow(flowFileName: string): void {
+    if (!flowFileName) {
+      console.log('loadTargetsForCurrentFlow: No hay nombre de archivo');
+      return;
+    }
+
+    console.log('loadTargetsForCurrentFlow llamado con:', flowFileName);
+
+    // Extraer nombre base del flujo (sin extensión)
+    const flowNameBase = flowFileName.replace('.json', '').toUpperCase();
+    console.log('flowNameBase:', flowNameBase);
+    
+    // Construir nombre del archivo de targets
+    const targetFileName = `${flowNameBase}-targets.json`;
+    console.log('Buscando archivo de targets:', targetFileName);
+    
+    // Buscar el archivo de targets en la lista
+    this.loadingTargets = true;
+    this.sftpService.listTargets().subscribe({
+      next: (response) => {
+        this.loadingTargets = false;
+        if (response.status && response.files) {
+          console.log('Archivos encontrados:', response.files.map(f => f.name));
+          const targetFile = response.files.find(
+            f => !f.isDirectory && f.name === targetFileName
+          );
+          
+          if (targetFile) {
+            console.log('Archivo de targets encontrado:', targetFile.path);
+            // Cargar el contenido del archivo de targets
+            this.sftpService.getTargetContent(targetFile.path).subscribe({
+              next: (targetResponse) => {
+                if (targetResponse.status && targetResponse.content) {
+                  try {
+                    const targetsData = JSON.parse(targetResponse.content);
+                    console.log('loadTargetsForCurrentFlow - targetsData cargado:', Object.keys(targetsData.TargetControls || {}));
+                    // Procesar los targets del archivo
+                    // IMPORTANTE: Esto sobrescribirá availableTargets con los FriendlyName correctos
+                    // Pasar el path real del archivo para que se use correctamente
+                    this.processTargetsFromFile(targetsData, flowNameBase, targetFile.path);
+                  } catch (error) {
+                    console.error('Error al parsear targets:', error);
+                  }
+                } else {
+                  console.error('Error en respuesta de getTargetContent:', targetResponse.message);
+                }
+              },
+              error: (error) => {
+                console.error('Error al cargar contenido de targets:', error);
+              }
+            });
+          } else {
+            console.log(`No se encontró archivo de targets para el flujo: ${targetFileName}`);
+            console.log('Archivos disponibles:', response.files.map(f => f.name));
+          }
+        } else {
+          console.error('Error en respuesta de listTargets:', response.message);
+        }
+      },
+      error: (error) => {
+        this.loadingTargets = false;
+        console.error('Error al buscar targets del flujo:', error);
+      }
+    });
+  }
+
+  /**
+   * Procesa los targets cargados desde un archivo
+   * El archivo contiene TargetControls donde cada clave es un FriendlyName (ej: "Set Controlling Area")
+   */
+  processTargetsFromFile(targetsData: any, flowNameBase: string, targetFilePath?: string): void {
+    console.log('processTargetsFromFile llamado con flowNameBase:', flowNameBase);
+    // El archivo contiene un objeto con la estructura: { Tcode, Generated, TargetControls: { ... } }
+    if (typeof targetsData === 'object' && !Array.isArray(targetsData)) {
+      // Usar el path proporcionado o construir uno por defecto
+      const filePath = targetFilePath || `~/lek-files/can/sap-config/sap-gui-flow/sap-targets$/${flowNameBase}-targets.json`;
+      
+      // Procesar TargetControls si existe
+      if (targetsData.TargetControls && typeof targetsData.TargetControls === 'object') {
+        const targetKeys = Object.keys(targetsData.TargetControls);
+        console.log('TargetKeys encontrados:', targetKeys);
+        
+        // Limpiar targets anteriores para este flujo
+        // IMPORTANTE: Esto sobrescribe cualquier target cargado previamente por loadTargetsFromSftp
+        this.availableTargets = [];
+        this.targetContextKeyToFriendlyNameMap = {};
+        
+        // Crear mapeo entre claves del targetContext del flujo y FriendlyName del archivo
+        if (this.targetContextData) {
+          Object.keys(this.targetContextData).forEach(flowKey => {
+            const context = this.targetContextData[flowKey];
+            if (typeof context === 'object' && context.FriendlyName) {
+              const friendlyName = context.FriendlyName;
+              // Buscar si este FriendlyName existe en TargetControls
+              if (targetsData.TargetControls[friendlyName]) {
+                this.targetContextKeyToFriendlyNameMap[flowKey] = friendlyName;
+              }
+            }
+          });
+        }
+        
+        targetKeys.forEach(friendlyName => {
+          const targetControls = targetsData.TargetControls[friendlyName];
+          
+          // Buscar la clave del targetContext del flujo que corresponde a este FriendlyName
+          const flowKey = Object.keys(this.targetContextKeyToFriendlyNameMap).find(
+            key => this.targetContextKeyToFriendlyNameMap[key] === friendlyName
+          ) || friendlyName; // Si no hay mapeo, usar el FriendlyName como clave
+          
+          // Agregar a la lista de targets disponibles
+          // IMPORTANTE: Usar FriendlyName como key, no el nombre del archivo
+          this.availableTargets.push({
+            key: friendlyName, // Usar FriendlyName como clave principal
+            friendlyName: friendlyName,
+            path: filePath,
+            flowContextKey: flowKey // Guardar la clave del flujo para referencia
+          });
+        });
+        
+        console.log('availableTargets después de processTargetsFromFile:', this.availableTargets.map(t => ({ key: t.key, friendlyName: t.friendlyName })));
+        
+        // Si hay targets disponibles y no hay uno seleccionado, seleccionar el primero
+        if (targetKeys.length > 0 && !this.selectedTargetContext) {
+          const firstTargetKey = targetKeys[0];
+          console.log('Seleccionando automáticamente el primer target:', firstTargetKey);
+          // Cargar los controles del primer target automáticamente
+          setTimeout(() => {
+            this.selectTargetContextForControls(firstTargetKey);
+          }, 100);
+        }
+      }
+    }
+  }
+
+  /**
+   * Carga los metadatos (FriendlyName) de cada target
+   */
+  loadTargetsMetadata(): void {
+    this.availableTargets.forEach((target, index) => {
+      this.sftpService.getTargetContent(target.path).subscribe({
+        next: (response) => {
+          if (response.status && response.content) {
+            try {
+              const targetData = JSON.parse(response.content);
+              // Actualizar FriendlyName si existe
+              if (targetData.FriendlyName) {
+                this.availableTargets[index].friendlyName = targetData.FriendlyName;
+              }
+            } catch (error) {
+              console.error('Error al parsear target:', error);
+            }
+          }
+        },
+        error: (error) => {
+          console.error('Error al cargar metadata del target:', error);
+        }
+      });
+    });
+  }
+
+  /**
+   * Carga todos los targets disponibles desde SFTP
+   * Útil para flujos en blanco donde no hay un archivo de targets específico
+   */
+  loadAllAvailableTargets(): void {
+    console.log('loadAllAvailableTargets - Cargando todos los targets disponibles');
+    this.loadingTargets = true;
+    this.availableTargets = [];
+
+    this.sftpService.listTargets().subscribe({
+      next: (response) => {
+        if (response.status && response.files) {
+          const targetFiles = response.files.filter(file => !file.isDirectory && file.name.endsWith('.json'));
+          console.log('Archivos de targets encontrados:', targetFiles.map(f => f.name));
+
+          if (targetFiles.length === 0) {
+            this.loadingTargets = false;
+            return;
+          }
+
+          // Cargar contenido de cada archivo de targets
+          let loadedCount = 0;
+          targetFiles.forEach(targetFile => {
+            this.sftpService.getTargetContent(targetFile.path).subscribe({
+              next: (targetResponse) => {
+                if (targetResponse.status && targetResponse.content) {
+                  try {
+                    const targetsData = JSON.parse(targetResponse.content);
+                    
+                    // Extraer todos los FriendlyName de TargetControls
+                    if (targetsData.TargetControls && typeof targetsData.TargetControls === 'object') {
+                      Object.keys(targetsData.TargetControls).forEach(friendlyName => {
+                        // Verificar si este FriendlyName ya existe en availableTargets
+                        const exists = this.availableTargets.some(t => t.friendlyName === friendlyName);
+                        if (!exists) {
+                          this.availableTargets.push({
+                            key: friendlyName,
+                            friendlyName: friendlyName,
+                            path: targetFile.path,
+                            flowContextKey: friendlyName // Para flujos en blanco, usar FriendlyName como clave
+                          });
+                        }
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Error al parsear target:', targetFile.name, error);
+                  }
+                }
+                
+                loadedCount++;
+                if (loadedCount === targetFiles.length) {
+                  this.loadingTargets = false;
+                  console.log('loadAllAvailableTargets - Targets cargados:', this.availableTargets.map(t => t.friendlyName));
+                }
+              },
+              error: (error) => {
+                console.error('Error al cargar contenido de target:', targetFile.name, error);
+                loadedCount++;
+                if (loadedCount === targetFiles.length) {
+                  this.loadingTargets = false;
+                }
+              }
+            });
+          });
+        } else {
+          this.loadingTargets = false;
+          console.error('Error al cargar targets:', response.message);
+        }
+      },
+      error: (error) => {
+        this.loadingTargets = false;
+        console.error('Error al listar targets desde SFTP:', error);
+      }
+    });
+  }
+
+  /**
+   * Selecciona un targetContext y carga sus controles
+   */
+  selectTargetContextForControls(friendlyName: string): void {
+    console.log('selectTargetContextForControls llamado con:', friendlyName);
+    this.selectedTargetContext = friendlyName;
+    this.controlSearchTerm = ''; // Limpiar búsqueda al cambiar de contexto
+    this.selectedControlTypes = []; // Limpiar filtro de tipos al cambiar de contexto
+    
+    // Encontrar el target seleccionado por FriendlyName
+    const target = this.availableTargets.find(t => t.key === friendlyName || t.friendlyName === friendlyName);
+    console.log('Target encontrado:', target);
+    
+    if (target) {
+      this.selectedTargetPath = target.path;
+      
+      // Cargar el contenido del archivo de targets desde SFTP
+      this.sftpService.getTargetContent(target.path).subscribe({
+        next: (response) => {
+          if (response.status && response.content) {
+            try {
+              const targetsData = JSON.parse(response.content);
+              console.log('Datos parseados. Claves disponibles en TargetControls:', Object.keys(targetsData.TargetControls || {}));
+              console.log('Buscando FriendlyName:', friendlyName);
+              
+              // El archivo tiene la estructura: { Tcode, Generated, TargetControls: { ... } }
+              // Obtener el array de controles del targetContext específico usando FriendlyName
+              const targetControls = targetsData.TargetControls?.[friendlyName];
+              console.log('TargetControls encontrado:', targetControls ? `${targetControls.length} controles` : 'NO ENCONTRADO');
+              
+              if (targetControls && Array.isArray(targetControls)) {
+                // Procesar los controles directamente desde el archivo
+                this.processControlsFromTargetFile(targetControls);
+              } else {
+                console.error(`TargetContext '${friendlyName}' no encontrado en TargetControls`);
+                console.log('Claves disponibles:', Object.keys(targetsData.TargetControls || {}));
+                this.loadingControls = false;
+              }
+            } catch (error) {
+              console.error('Error al parsear archivo de targets:', error);
+              this.loadingControls = false;
+            }
+          } else {
+            this.loadingControls = false;
+            console.error('Error al cargar archivo de targets:', response.message);
+          }
+        },
+        error: (error) => {
+          this.loadingControls = false;
+          console.error('Error al cargar archivo de targets desde SFTP:', error);
+        }
+      });
+    } else {
+      console.error('Target no encontrado:', friendlyName);
+      console.log('Targets disponibles:', this.availableTargets.map(t => ({ key: t.key, friendlyName: t.friendlyName })));
+    }
+  }
+
+  /**
+   * Carga un target desde SFTP y luego carga sus controles
+   * @param targetPath Ruta del archivo de targets
+   * @param friendlyName FriendlyName del targetContext (clave en TargetControls)
+   */
+  loadTargetFromSftp(targetPath: string, friendlyName: string): void {
+    this.loadingControls = true;
+    this.targetContextControls = [];
+
+    this.sftpService.getTargetContent(targetPath).subscribe({
+      next: (response) => {
+        if (response.status && response.content) {
+          try {
+            const targetData = JSON.parse(response.content);
+            // El archivo tiene la estructura: { Tcode, Generated, TargetControls: { ... } }
+            // Obtener el array de controles del targetContext específico usando FriendlyName
+            const targetControls = targetData.TargetControls?.[friendlyName];
+            if (targetControls && Array.isArray(targetControls)) {
+              // Procesar los controles directamente desde el archivo
+              this.processControlsFromTargetFile(targetControls);
+            } else {
+              console.error(`TargetContext '${friendlyName}' no encontrado en TargetControls`);
+              this.loadingControls = false;
+            }
+          } catch (error) {
+            console.error('Error al parsear target:', error);
+            this.loadingControls = false;
+          }
+        } else {
+          this.loadingControls = false;
+          console.error('Error al cargar target:', response.message);
+        }
+      },
+      error: (error) => {
+        this.loadingControls = false;
+        console.error('Error al cargar target desde SFTP:', error);
+      }
+    });
+  }
+
+  /**
+   * Procesa los controles desde el archivo de targets y filtra los manipulables
+   */
+  processControlsFromTargetFile(targetControls: any[]): void {
+    this.loadingControls = false;
+    
+    console.log('Procesando controles desde archivo:', targetControls?.length, 'controles totales');
+    
+    // Tipos de controles manipulables
+    const manipulableTypes = [
+      'GuiButton',
+      'GuiCheckBox',
+      'GuiRadioButton',
+      'GuiCTextField',
+      'GuiTextField',
+      'GuiComboBox',
+      'GuiComboBoxField',
+      'GuiListBox',
+      'GuiTab',
+      'GuiToggleButton',
+      'GuiToolbarButton',
+      'GuiGridToolbarButton'
+    ];
+    
+    // Filtrar y mapear controles manipulables
+    const filteredControls = targetControls
+      .filter(control => {
+        const controlType = control.ControlType || control.controlType;
+        const isManipulable = manipulableTypes.includes(controlType);
+        if (!isManipulable) {
+          console.log('Control no manipulable:', controlType, control.FriendlyName || control.friendlyName);
+        }
+        return isManipulable;
+      })
+      .map(control => ({
+        name: control.Id || control.id || control.FriendlyName || control.friendlyName,
+        friendlyName: control.FriendlyName || control.friendlyName || control.Id || control.id,
+        controlType: control.ControlType || control.controlType,
+        path: control.Id || control.id || '',
+        isManipulable: true
+      }));
+    
+    console.log('Controles manipulables encontrados:', filteredControls.length);
+    console.log('Ejemplos de controles:', filteredControls.slice(0, 5));
+    
+    this.targetContextControls = filteredControls;
+    
+    // Actualizar tipos disponibles
+    this.updateAvailableControlTypes();
+    
+    // Aplicar filtro inicial
+    this.filterControls();
+  }
+
+  /**
+   * Carga los controles de un targetContext desde el backend
+   */
+  loadTargetContextControls(targetContextKey: string, targetContextData?: any): void {
+    this.loadingControls = true;
+    this.targetContextControls = [];
+
+    // Usar el targetContext proporcionado o intentar obtenerlo del flujo actual
+    let targetContext = targetContextData;
+    if (!targetContext) {
+      targetContext = this.getTargetContextForControls(targetContextKey);
+    }
+    
+    // Preparar el flujo completo si está disponible
+    let flowData = null;
+    if (this.flowData) {
+      flowData = this.flowData;
+    } else if (this.targetContextData && this.stepsData) {
+      flowData = {
+        $meta: this.flowData?.$meta || {},
+        targetContext: this.targetContextData,
+        steps: this.stepsData
+      };
+    }
+
+    this.sftpService.getTargetContextControls(targetContextKey, targetContext, flowData).subscribe({
+      next: (response) => {
+        this.loadingControls = false;
+        if (response.status && response.controls) {
+          // El backend ya filtra los controles manipulables, pero podemos hacer un filtro adicional si es necesario
+          this.targetContextControls = response.controls.filter(control => control.isManipulable);
+          // Actualizar tipos disponibles
+          this.updateAvailableControlTypes();
+          this.filterControls(); // Aplicar filtro inicial
+        } else {
+          console.error('Error al cargar controles:', response.message);
+          // Si hay error pero tenemos targetContext, usar fallback
+          if (targetContext) {
+            this.loadControlsFromDeepAliases(targetContextKey);
+          }
+        }
+      },
+      error: (error) => {
+        this.loadingControls = false;
+        console.error('Error al cargar controles desde el backend:', error);
+        // Usar los deepaliases como fallback
+        this.loadControlsFromDeepAliases(targetContextKey);
+      }
+    });
+  }
+
+  /**
+   * Obtiene el targetContext completo para enviarlo al backend
+   */
+  private getTargetContextForControls(targetContextKey: string): any {
+    if (!this.targetContextData || !this.targetContextData[targetContextKey]) {
+      return null;
+    }
+    
+    return this.targetContextData[targetContextKey];
+  }
+
+  /**
+   * Carga controles desde deepaliases como fallback
+   */
+  loadControlsFromDeepAliases(targetContextKey: string): void {
+    const deepAliases = this.getTargetContextDeepAliases(targetContextKey);
+    if (deepAliases) {
+      this.targetContextControls = Object.keys(deepAliases).map(alias => ({
+        name: alias,
+        friendlyName: alias,
+        controlType: 'GuiControl', // Tipo genérico
+        path: deepAliases[alias],
+        isManipulable: true
+      }));
+      // Actualizar tipos disponibles
+      this.updateAvailableControlTypes();
+      this.filterControls(); // Aplicar filtro inicial
+    }
+  }
+
+  /**
+   * Filtra los controles según el término de búsqueda y el tipo seleccionado
+   */
+  filterControls(): void {
+    let filtered = [...this.targetContextControls];
+
+    // Filtrar por tipo de control si hay tipos seleccionados
+    if (this.selectedControlTypes.length > 0) {
+      filtered = filtered.filter(control => 
+        this.selectedControlTypes.includes(control.controlType)
+      );
+    }
+
+    // Filtrar por término de búsqueda si hay uno
+    if (this.controlSearchTerm && this.controlSearchTerm.trim() !== '') {
+      const searchTerm = this.controlSearchTerm.toLowerCase().trim();
+      filtered = filtered.filter(control => {
+        return (
+          control.name.toLowerCase().includes(searchTerm) ||
+          control.friendlyName.toLowerCase().includes(searchTerm) ||
+          control.controlType.toLowerCase().includes(searchTerm) ||
+          control.path.toLowerCase().includes(searchTerm)
+        );
+      });
+    }
+
+    this.filteredTargetContextControls = filtered;
+  }
+
+  /**
+   * Actualiza la lista de tipos de controles disponibles
+   */
+  updateAvailableControlTypes(): void {
+    const types = new Set<string>();
+    this.targetContextControls.forEach(control => {
+      if (control.controlType) {
+        types.add(control.controlType);
+      }
+    });
+    this.availableControlTypes = Array.from(types).sort();
+  }
+
+  /**
+   * Alterna el filtro de tipo de control
+   */
+  toggleControlTypeFilter(type: string): void {
+    const index = this.selectedControlTypes.indexOf(type);
+    if (index === -1) {
+      this.selectedControlTypes.push(type);
+    } else {
+      this.selectedControlTypes.splice(index, 1);
+    }
+    this.filterControls();
+  }
+
+  /**
+   * Limpia el filtro de tipo de control
+   */
+  clearControlTypeFilter(): void {
+    this.selectedControlTypes = [];
+    this.filterControls();
+  }
+
+  /**
+   * Obtiene el ícono según el tipo de control
+   */
+  getControlIcon(controlType: string): string {
+    if (controlType.includes('Button')) return 'bi-circle';
+    if (controlType.includes('CheckBox')) return 'bi-check-square';
+    if (controlType.includes('RadioButton')) return 'bi-record-circle';
+    if (controlType.includes('TextField') || controlType.includes('ComboBox')) return 'bi-input-cursor-text';
+    if (controlType.includes('Tab')) return 'bi-folder';
+    if (controlType.includes('Menu')) return 'bi-list';
+    if (controlType.includes('Toolbar')) return 'bi-tools';
+    return 'bi-square';
+  }
+
+  /**
+   * Selecciona un control y lo añade al canvas de targetContext dentro de un contenedor
+   */
+  selectControl(control: any): void {
+    if (!this.selectedTargetContext) {
+      console.warn('No hay targetContext seleccionado');
+      return;
+    }
+
+    // Cambiar a la pestaña de targetContext si no está activa
+    if (this.activeTab !== 'targetContext') {
+      this.activeTab = 'targetContext';
+    }
+
+    let container: TargetContainer | null = null;
+
+    // Si hay un contenedor seleccionado y el control es del mismo contexto
+    if (this.selectedContainer && this.selectedContainer.targetContextKey === this.selectedTargetContext) {
+      // Agregar al contenedor seleccionado
+      container = this.selectedContainer;
+    } else {
+      // Si no hay contenedor seleccionado o es de otro contexto, crear uno nuevo
+      // Verificar si ya existe una instancia de este contexto
+      const existingContainers = this.targetContainers.filter(
+        c => c.targetContextKey === this.selectedTargetContext
+      );
+
+      // Determinar el número de instancia
+      const instanceNumber = existingContainers.length > 0 
+        ? Math.max(...existingContainers.map(c => c.instanceNumber)) + 1 
+        : 1;
+
+      // Crear nuevo contenedor con instancia
+      const friendlyName = this.getTargetContextFriendlyName(this.selectedTargetContext!) || this.selectedTargetContext!;
+      container = this.createTargetContainer(this.selectedTargetContext!, friendlyName, instanceNumber);
+      this.targetContainers.push(container);
+      
+      // Conectar con el contenedor anterior si existe
+      if (this.selectedContainer) {
+        this.connectContainers(this.selectedContainer.id, container.id);
+      }
+      
+      // Actualizar colores después de agregar contenedor
+      this.updateContainerColors();
+    }
+
+    // Agregar control al contenedor
+    const controlNode = this.createControlNode(control, container);
+    container.controls.push(controlNode);
+    this.targetContextNodes.push(controlNode);
+    
+    // Actualizar tamaño del contenedor
+    this.updateContainerSize(container);
+    
+    // Organizar controles dentro del contenedor
+    this.arrangeControlsInContainer(container);
+    
+    this.selectContainer(container);
+    console.log('Control agregado al contenedor:', controlNode);
+  }
+
+  /**
+   * Crea un nuevo contenedor de target
+   */
+  createTargetContainer(targetContextKey: string, friendlyName: string, instanceNumber: number = 1): TargetContainer {
+    // Posicionar contenedores en grid
+    const containerCount = this.targetContainers.length;
+    const colsPerRow = 2;
+    const containerWidth = 400;
+    const containerHeight = 200;
+    // Espaciado aumentado para evitar superposiciones
+    const spacingX = 500; // Aumentado de 450 a 500
+    const spacingY = 400; // Aumentado de 350 a 400 (se ajustará dinámicamente en arrangeContainers)
+    
+    const col = containerCount % colsPerRow;
+    const row = Math.floor(containerCount / colsPerRow);
+    
+    // Generar clave completa con instancia (ej: "SCAREA::1")
+    const fullKey = instanceNumber > 1 ? `${targetContextKey}::${instanceNumber}` : targetContextKey;
+    
+    const container: TargetContainer = {
+      id: `container_${fullKey}_${Date.now()}`,
+      targetContextKey: targetContextKey,
+      instanceNumber: instanceNumber,
+      fullKey: fullKey,
+      friendlyName: friendlyName,
+      x: 100 + (col * spacingX),
+      y: 100 + (row * spacingY),
+      width: containerWidth,
+      height: containerHeight,
+      controls: [],
+      isCollapsed: false,
+      colorClass: '' // Se asignará dinámicamente
+    };
+    
+    // Asignar color dinámicamente después de agregar al array
+    // Esto se hará en updateContainerColors()
+    return container;
+  }
+
+  /**
+   * Conecta dos contenedores con una flecha (flujo unidireccional)
+   */
+  connectContainers(sourceContainerId: string, targetContainerId: string): void {
+    // Verificar que no exista ya esta conexión
+    const existingConnection = this.containerConnections.find(
+      conn => conn.sourceId === sourceContainerId && conn.targetId === targetContainerId
+    );
+    
+    if (!existingConnection) {
+      this.containerConnections.push({
+        sourceId: sourceContainerId,
+        targetId: targetContainerId
+      });
+      
+      // Actualizar el contenedor fuente para que apunte al siguiente
+      const sourceContainer = this.targetContainers.find(c => c.id === sourceContainerId);
+      if (sourceContainer) {
+        sourceContainer.nextContainerId = targetContainerId;
+      }
+    }
+  }
+
+  /**
+   * Desconecta dos contenedores
+   */
+  disconnectContainers(sourceContainerId: string, targetContainerId: string): void {
+    const index = this.containerConnections.findIndex(
+      conn => conn.sourceId === sourceContainerId && conn.targetId === targetContainerId
+    );
+    
+    if (index !== -1) {
+      this.containerConnections.splice(index, 1);
+      
+      // Limpiar referencia en el contenedor fuente
+      const sourceContainer = this.targetContainers.find(c => c.id === sourceContainerId);
+      if (sourceContainer && sourceContainer.nextContainerId === targetContainerId) {
+        sourceContainer.nextContainerId = undefined;
+      }
+    }
+  }
+
+  /**
+   * Obtiene el path SVG para una conexión entre contenedores
+   */
+  getPathForContainerConnection(sourceId: string, targetId: string): string {
+    const sourceContainer = this.targetContainers.find(c => c.id === sourceId);
+    const targetContainer = this.targetContainers.find(c => c.id === targetId);
+    
+    if (!sourceContainer || !targetContainer) {
+      return '';
+    }
+    
+    // Calcular puntos de inicio y fin
+    const startX = sourceContainer.x + sourceContainer.width;
+    const startY = sourceContainer.y + (sourceContainer.height / 2);
+    const endX = targetContainer.x;
+    const endY = targetContainer.y + (targetContainer.height / 2);
+    
+    // Crear curva suave
+    const midX = (startX + endX) / 2;
+    const controlPoint1X = startX + (endX - startX) * 0.5;
+    const controlPoint1Y = startY;
+    const controlPoint2X = endX - (endX - startX) * 0.5;
+    const controlPoint2Y = endY;
+    
+    return `M ${startX} ${startY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${endX} ${endY}`;
+  }
+
+  /**
+   * Actualiza los colores de los contenedores dinámicamente
+   * El primer y último contenedor tienen colores distintos
+   */
+  updateContainerColors(): void {
+    if (this.targetContainers.length === 0) return;
+    
+    this.targetContainers.forEach((container, index) => {
+      const totalContainers = this.targetContainers.length;
+      
+      if (totalContainers === 1) {
+        // Si solo hay un contenedor, usar color especial
+        container.colorClass = 'container-single';
+      } else if (index === 0) {
+        // Primer contenedor
+        container.colorClass = 'container-first';
+      } else if (index === totalContainers - 1) {
+        // Último contenedor
+        container.colorClass = 'container-last';
+      } else {
+        // Contenedores intermedios
+        container.colorClass = 'container-middle';
+      }
+    });
+  }
+
+  /**
+   * Crea un nodo de control dentro de un contenedor
+   */
+  createControlNode(control: any, container: TargetContainer): FlowNode {
+    const controlIndex = container.controls.length;
+    const controlWidth = 180;
+    const controlHeight = 100;
+    const padding = 20;
+    const spacing = 10;
+    
+    // Posición relativa al contenedor
+    const relativeX = padding;
+    const relativeY = padding + (controlIndex * (controlHeight + spacing));
+    
+    return {
+      id: `control_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: 'action',
+      label: control.friendlyName || control.name,
+      x: container.x + relativeX,
+      y: container.y + relativeY,
+      data: {
+        action: 'set',
+        target: control.name,
+        controlType: control.controlType,
+        path: control.path,
+        targetContextKey: container.targetContextKey,
+        friendlyName: control.friendlyName,
+        containerId: container.id
+      }
+    };
+  }
+
+  /**
+   * Actualiza el tamaño del contenedor basado en sus controles
+   */
+  updateContainerSize(container: TargetContainer): void {
+    if (container.controls.length === 0) {
+      container.height = 200;
+      return;
+    }
+
+    const controlHeight = 100;
+    const spacing = 10;
+    const padding = 20;
+    
+    const totalControlsHeight = container.controls.length * (controlHeight + spacing) - spacing;
+    container.height = totalControlsHeight + (padding * 2);
+    
+    // Asegurar altura mínima
+    if (container.height < 200) {
+      container.height = 200;
+    }
+    
+    // Si el contenedor tiene muchos controles, reorganizar el espacio
+    // Solo reorganizar si hay más de 3 controles para evitar reorganizaciones innecesarias
+    if (container.controls.length > 3) {
+      // Reorganizar controles dentro del contenedor
+      this.arrangeControlsInContainer(container);
+    }
+  }
+
+  /**
+   * Organiza los controles dentro del contenedor
+   */
+  arrangeControlsInContainer(container: TargetContainer): void {
+    const controlWidth = 180;
+    const controlHeight = 100;
+    const padding = 20;
+    const spacing = 10;
+    
+    container.controls.forEach((control, index) => {
+      control.x = container.x + padding;
+      control.y = container.y + padding + (index * (controlHeight + spacing));
+    });
+    
+    this.updateContainerSize(container);
+  }
+
+  /**
+   * Selecciona un contenedor
+   */
+  selectContainer(container: TargetContainer): void {
+    this.selectedContainer = container;
+  }
+
+  /**
+   * Elimina un contenedor y todos sus controles
+   */
+  deleteContainer(containerId: string): void {
+    const container = this.targetContainers.find(c => c.id === containerId);
+    if (!container) return;
+
+    // Eliminar todos los controles del contenedor
+    container.controls.forEach(control => {
+      const index = this.targetContextNodes.findIndex(n => n.id === control.id);
+      if (index !== -1) {
+        this.targetContextNodes.splice(index, 1);
+      }
+    });
+
+    // Eliminar el contenedor
+    const containerIndex = this.targetContainers.findIndex(c => c.id === containerId);
+    if (containerIndex !== -1) {
+      // Eliminar todas las conexiones relacionadas con este contenedor
+      this.containerConnections = this.containerConnections.filter(
+        conn => conn.sourceId !== containerId && conn.targetId !== containerId
+      );
+      
+      this.targetContainers.splice(containerIndex, 1);
+      // Actualizar colores después de eliminar contenedor
+      this.updateContainerColors();
+    }
+
+    if (this.selectedContainer?.id === containerId) {
+      this.selectedContainer = null;
+    }
+  }
+
+  /**
+   * Mueve un contenedor y todos sus controles
+   */
+  moveContainer(container: TargetContainer, newX: number, newY: number): void {
+    const deltaX = newX - container.x;
+    const deltaY = newY - container.y;
+
+    container.x = this.snapToGrid(newX);
+    container.y = this.snapToGrid(newY);
+
+    // Mover todos los controles relativamente
+    container.controls.forEach(control => {
+      control.x += deltaX;
+      control.y += deltaY;
+    });
+  }
+
+  /**
+   * Inicia el arrastre de un contenedor
+   */
+  onContainerDragStart(event: DragEvent, container: TargetContainer): void {
+    if (event.dataTransfer) {
+      event.dataTransfer.setData('containerId', container.id);
+      this.isDraggingContainer = true;
+      this.selectedContainer = container;
+      
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      const canvas = this.elementRef.nativeElement.querySelector('.flow-canvas');
+      if (canvas) {
+        const canvasRect = canvas.getBoundingClientRect();
+        this.dragContainerOffset.x = event.clientX - rect.left;
+        this.dragContainerOffset.y = event.clientY - rect.top;
+      }
+    }
+  }
+
+  /**
+   * Selecciona un nodo de targetContext
+   */
+  selectTargetContextNode(node: FlowNode): void {
+    this.selectedTargetContextNode = node;
+  }
+
+  /**
+   * Elimina un nodo de targetContext
+   */
+  deleteTargetContextNode(): void {
+    if (this.selectedTargetContextNode) {
+      const node = this.selectedTargetContextNode;
+      const container = this.targetContainers.find(c => c.id === node.data?.containerId);
+      
+      if (container) {
+        this.deleteControlFromContainer(node, container);
+      } else {
+        const index = this.targetContextNodes.findIndex(n => n.id === node.id);
+        if (index !== -1) {
+          this.targetContextNodes.splice(index, 1);
+        }
+      }
+      
+      this.selectedTargetContextNode = null;
+    }
+  }
+
+  /**
+   * Elimina un control de un contenedor
+   */
+  deleteControlFromContainer(control: FlowNode, container: TargetContainer): void {
+    const controlIndex = container.controls.findIndex(c => c.id === control.id);
+    if (controlIndex !== -1) {
+      container.controls.splice(controlIndex, 1);
+    }
+
+    const nodeIndex = this.targetContextNodes.findIndex(n => n.id === control.id);
+    if (nodeIndex !== -1) {
+      this.targetContextNodes.splice(nodeIndex, 1);
+    }
+
+    // Actualizar tamaño del contenedor
+    this.updateContainerSize(container);
+    
+    // Reorganizar controles restantes
+    this.arrangeControlsInContainer(container);
+
+    // Si el contenedor queda vacío, eliminarlo
+    if (container.controls.length === 0) {
+      this.deleteContainer(container.id);
+    }
+  }
+
+  /**
+   * Genera contenedores visuales desde targetContextData
+   */
+  generateTargetContextNodes(): void {
+    this.targetContextNodes = [];
+    this.targetContainers = [];
+    
+    if (!this.targetContextData) return;
+    
+    const keys = Object.keys(this.targetContextData);
+    keys.forEach((key) => {
+      const context = this.targetContextData[key];
+      
+      // Saltar si el contexto es solo un string (ej: "CHLYT": "Choose Layout")
+      if (typeof context === 'string') {
+        return;
+      }
+      
+      const friendlyName = typeof context === 'object' && context.FriendlyName 
+        ? context.FriendlyName 
+        : key;
+      
+      // Crear contenedor
+      const container = this.createTargetContainer(key, friendlyName, 1); // Primera instancia
+      this.targetContainers.push(container);
+      
+      // Procesar deepaliases si existen para crear controles dentro del contenedor
+      if (typeof context === 'object' && context.deepaliases) {
+        const deepAliases = context.deepaliases;
+        const aliasKeys = Object.keys(deepAliases);
+        
+        aliasKeys.forEach((aliasName) => {
+          const aliasPath = deepAliases[aliasName];
+          
+          // Crear objeto de control desde el deepalias
+          const control = {
+            name: aliasName,
+            friendlyName: aliasName,
+            controlType: this.inferControlTypeFromPath(aliasPath),
+            path: aliasPath,
+            isManipulable: true
+          };
+          
+          // Crear nodo de control y agregarlo al contenedor
+          const controlNode = this.createControlNode(control, container);
+          container.controls.push(controlNode);
+          this.targetContextNodes.push(controlNode);
+        });
+        
+        // Actualizar tamaño del contenedor después de agregar controles
+        this.updateContainerSize(container);
+      }
+    });
+    
+    // Organizar contenedores en grid
+    this.arrangeContainers();
+    
+    // Actualizar colores después de generar todos los contenedores
+    this.updateContainerColors();
+  }
+
+  /**
+   * Infiere el tipo de control desde el path
+   */
+  inferControlTypeFromPath(path: string): string {
+    if (!path) return 'GuiControl';
+    
+    // Detectar tipos comunes de controles SAP GUI desde el path
+    if (path.includes('/btn[')) return 'GuiButton';
+    if (path.includes('/ctxt')) return 'GuiTextField';
+    if (path.includes('/chk')) return 'GuiCheckBox';
+    if (path.includes('/radiobtn')) return 'GuiRadioButton';
+    if (path.includes('/cmb')) return 'GuiComboBox';
+    if (path.includes('/shell')) return 'GuiShell';
+    if (path.includes('(Ctrl+') || path.includes('(F')) return 'GuiButton'; // Atajos de teclado
+    
+    return 'GuiControl';
+  }
+
+  /**
+   * Organiza los contenedores en un grid ordenado con espaciado dinámico
+   */
+  arrangeContainers(): void {
+    const colsPerRow = 2;
+    const startX = 100;
+    const startY = 100;
+    const spacingX = 500; // Espaciado horizontal aumentado
+    const minSpacingY = 50; // Espaciado vertical mínimo entre contenedores
+    
+    // Primero, actualizar el tamaño de todos los contenedores
+    this.targetContainers.forEach(container => {
+      this.updateContainerSize(container);
+    });
+    
+    // Organizar en grid con espaciado dinámico basado en la altura real
+    let currentY = startY;
+    let currentRow = 0;
+    
+    this.targetContainers.forEach((container, index) => {
+      const col = index % colsPerRow;
+      const row = Math.floor(index / colsPerRow);
+      
+      // Si cambiamos de fila, ajustar la posición Y
+      if (row !== currentRow) {
+        // Encontrar la altura máxima de los contenedores en la fila anterior
+        const previousRowStart = (currentRow) * colsPerRow;
+        const previousRowEnd = Math.min(previousRowStart + colsPerRow, this.targetContainers.length);
+        let maxHeightInRow = 0;
+        
+        for (let i = previousRowStart; i < previousRowEnd; i++) {
+          const prevContainer = this.targetContainers[i];
+          if (prevContainer && prevContainer.height > maxHeightInRow) {
+            maxHeightInRow = prevContainer.height;
+          }
+        }
+        
+        // Mover Y basándose en la altura máxima de la fila anterior + espaciado
+        currentY += maxHeightInRow + minSpacingY;
+        currentRow = row;
+      }
+      
+      container.x = startX + (col * spacingX);
+      container.y = currentY;
+      
+      // Actualizar posiciones de controles dentro del contenedor
+      this.arrangeControlsInContainer(container);
+    });
+    
+    // Actualizar colores después de reorganizar
+    this.updateContainerColors();
+  }
   
-  // Variables para el editor visual de subflujos
-  showSubflowEditor: boolean = false;
-  editingSubflow: any = null;
   
   // Variables para el acordeón
   accordionState: {[key: string]: boolean} = {
     buttons: true,
     types: true,
-    subflows: false,
-    filters: false  // Añadir nuevo estado para el acordeón de filtros
+    filters: false,
+    sapControls: false  // Añadir nuevo estado para el acordeón de controles SAP
   };
+  
+  // Variables para Controles SAP
+  availableTargets: Array<{ key: string; friendlyName: string; path: string; flowContextKey?: string }> = [];
+  loadingTargets = false;
+  selectedTargetContext: string | null = null;
+  selectedTargetPath: string | null = null;
+  // Mapeo entre claves del targetContext del flujo y FriendlyName del archivo de targets
+  targetContextKeyToFriendlyNameMap: { [flowKey: string]: string } = {};
+  targetContextControls: Array<{
+    name: string;
+    friendlyName: string;
+    controlType: string;
+    path: string;
+    isManipulable: boolean;
+  }> = [];
+  filteredTargetContextControls: Array<{
+    name: string;
+    friendlyName: string;
+    controlType: string;
+    path: string;
+    isManipulable: boolean;
+  }> = [];
+  controlSearchTerm: string = '';
+  loadingControls = false;
   
   // Variables para el filtro por tipo de control
   availableControlTypes: string[] = [];
@@ -94,7 +1386,12 @@ export class FlowEditorComponent implements OnInit {
   
   private subscriptions: Subscription[] = [];
   
-  constructor(private flowService: FlowService, private fileService: FileService, private elementRef: ElementRef) { }
+  constructor(
+    private flowService: FlowService, 
+    private fileService: FileService, 
+    private elementRef: ElementRef,
+    private sftpService: SftpService
+  ) { }
 
   ngOnInit(): void {
     // Suscribirse a cambios en el flujo actual
@@ -110,8 +1407,6 @@ export class FlowEditorComponent implements OnInit {
             this.autoArrangeNodes();
           }
           
-          // Inicializar la lista de subflujos
-          this.filterSubflows();
         }
       })
     );
@@ -128,6 +1423,8 @@ export class FlowEditorComponent implements OnInit {
       this.fileService.getSelectedFile().subscribe(file => {
         if (file && file.content) {
           try {
+            this.currentFlowFileName = file.name; // Guardar nombre del flujo
+            // importFlowFromJson ya llama a loadTargetsForCurrentFlow internamente
             this.importFlowFromJson(file.content, file.name);
           } catch (error) {
             console.error('Error al cargar el flujo:', error);
@@ -144,15 +1441,17 @@ export class FlowEditorComponent implements OnInit {
     // Detectar teclas para atajos de teclado
     this.setupKeyboardShortcuts();
     
-    // Inicializar el acordeón
-    this.accordionState = {
-      buttons: true,
-      types: true,
-      subflows: false
-    };
+    // Inicializar el acordeón (ya está inicializado en la declaración de la propiedad)
+    // No es necesario reinicializarlo aquí
     
     // Cargar los tipos de controles disponibles
     this.loadControlTypes();
+    
+    // NO cargar targets genéricos aquí porque cuando se carga un flujo,
+    // loadTargetsForCurrentFlow se ejecutará y poblará availableTargets con los FriendlyName correctos.
+    // Si se carga un flujo, los targets se cargarán desde loadTargetsForCurrentFlow.
+    // Si no hay flujo cargado, los targets se cargarán cuando sea necesario.
+    // this.loadTargetsFromSftp(); // Comentado: se carga cuando se carga un flujo específico
   }
   
   ngOnDestroy(): void {
@@ -247,8 +1546,64 @@ export class FlowEditorComponent implements OnInit {
   }
   
   importFlowFromJson(jsonContent: string, name: string): void {
-    this.flowService.importSapFlow(jsonContent, name);
-    this.flowCode = jsonContent;
+    try {
+      this.flowData = JSON.parse(jsonContent);
+      this.currentFlowFileName = name; // Guardar nombre del flujo
+      
+      // Extraer steps y targetContext
+      if (this.flowData.steps) {
+        this.stepsData = this.flowData.steps;
+      } else {
+        this.stepsData = {};
+      }
+      
+      if (this.flowData.targetContext) {
+        this.targetContextData = this.flowData.targetContext;
+      } else {
+        this.targetContextData = {};
+      }
+      
+      this.flowService.importSapFlow(jsonContent, name);
+      this.flowCode = jsonContent;
+      
+      // Generar nodos visuales para targetContext
+      this.generateTargetContextNodes();
+      
+      // Cargar targets correspondientes al flujo si hay nombre de archivo
+      // Esto sobrescribirá cualquier target cargado previamente
+      if (name && name !== 'Flujo importado' && name !== 'Flujo nuevo') {
+        // Verificar si es un flujo en blanco (empieza con "Nuevo_Flujo_")
+        if (name.startsWith('Nuevo_Flujo_')) {
+          console.log('importFlowFromJson - Flujo en blanco detectado, cargando todos los targets disponibles');
+          // Para flujos en blanco, cargar todos los targets disponibles
+          this.availableTargets = [];
+          this.selectedTargetContext = null;
+          this.targetContextControls = [];
+          this.loadAllAvailableTargets();
+        } else {
+          console.log('importFlowFromJson - Cargando targets para flujo:', name);
+          // Limpiar targets anteriores antes de cargar los nuevos
+          this.availableTargets = [];
+          this.selectedTargetContext = null;
+          this.targetContextControls = [];
+          // Cargar targets del flujo - esto poblará availableTargets con FriendlyName
+          this.loadTargetsForCurrentFlow(name);
+        }
+      } else {
+        console.log('importFlowFromJson - No hay nombre de archivo válido, limpiando targets');
+        // Si no hay flujo cargado, limpiar también los targets
+        this.availableTargets = [];
+        this.selectedTargetContext = null;
+        this.targetContextControls = [];
+      }
+    } catch (error) {
+      console.error('Error al parsear JSON:', error);
+      this.flowService.importSapFlow(jsonContent, name);
+      this.flowCode = jsonContent;
+      // Inicializar vacío si hay error
+      this.stepsData = {};
+      this.targetContextData = {};
+    }
   }
   
   exportFlowToJson(): string {
@@ -282,7 +1637,6 @@ export class FlowEditorComponent implements OnInit {
     switch (type) {
       case 'action': return 'bi-play-circle';
       case 'decision': return 'bi-diamond';
-      case 'subflow': return 'bi-diagram-3';
       default: return 'bi-question-circle';
     }
   }
@@ -298,7 +1652,7 @@ export class FlowEditorComponent implements OnInit {
   
   enterFullscreen(): void {
     this.isFullscreen = true;
-    this.canvasHeight = this.fullscreenHeight;
+    this.canvasHeight = 'calc(100vh - 48px)';
     
     // No usar el API de Fullscreen nativo, ya que causa problemas
     // Solo usar nuestro propio modo de pantalla completa mediante CSS
@@ -312,7 +1666,7 @@ export class FlowEditorComponent implements OnInit {
   
   exitFullscreen(): void {
     this.isFullscreen = false;
-    this.canvasHeight = this.originalHeight;
+    this.canvasHeight = '600px';
     
     // Si estamos en fullscreen nativo del navegador, salir de él
     if (document.fullscreenElement) {
@@ -343,7 +1697,7 @@ export class FlowEditorComponent implements OnInit {
     // Si salimos del fullscreen nativo, asegurarnos de actualizar nuestro estado
     if (!isInFullscreen && this.isFullscreen) {
       this.isFullscreen = false;
-      this.canvasHeight = this.originalHeight;
+      this.canvasHeight = '600px';
       document.body.classList.remove('editor-fullscreen');
     }
   }
@@ -574,21 +1928,31 @@ export class FlowEditorComponent implements OnInit {
       const y = (event.clientY - rect.top - this.panOffsetY) / this.zoomLevel;
       
       if (type) {
-        // Crear un nuevo nodo
-        this.addNode(type as 'action' | 'decision' | 'subflow', this.snapToGrid(x), this.snapToGrid(y));
+        // Crear un nuevo nodo (solo para steps)
+        if (this.activeTab === 'steps') {
+          this.addNode(type as 'action' | 'decision', this.snapToGrid(x), this.snapToGrid(y));
+        }
       } else if (nodeId) {
-        // Mover un nodo existente
-        const node = this.flowNodes.find(n => n.id === nodeId);
-        if (node) {
-          node.x = this.snapToGrid(x);
-          node.y = this.snapToGrid(y);
-          this.flowService.updateNode(node);
+        // Mover un nodo existente (steps o targetContext)
+        if (this.activeTab === 'steps') {
+          const node = this.flowNodes.find(n => n.id === nodeId);
+          if (node) {
+            node.x = this.snapToGrid(x);
+            node.y = this.snapToGrid(y);
+            this.flowService.updateNode(node);
+          }
+        } else if (this.activeTab === 'targetContext') {
+          const node = this.targetContextNodes.find(n => n.id === nodeId);
+          if (node) {
+            node.x = this.snapToGrid(x);
+            node.y = this.snapToGrid(y);
+          }
         }
       }
     }
   }
   
-  addNode(type: 'action' | 'decision' | 'subflow', x: number, y: number): void {
+  addNode(type: 'action' | 'decision', x: number, y: number): void {
     const newNode = this.flowService.addNode(type, x, y);
     if (newNode) {
       this.selectNode(newNode);
@@ -650,7 +2014,7 @@ export class FlowEditorComponent implements OnInit {
         const updatedNode: FlowNode = {
           ...originalNode,
           label: nodeData.label || originalNode.label,
-          type: nodeData.type as 'action' | 'decision' | 'subflow',
+          type: nodeData.type as 'action' | 'decision',
           data: nodeData.data || {}
         };
         
@@ -700,200 +2064,106 @@ export class FlowEditorComponent implements OnInit {
   
   // Método para mostrar el JSON completo del flujo
   viewFullJson(): void {
-    this.flowCode = this.exportFlowToJson();
+    // Generar JSON de targetContext en lugar de steps
+    this.flowCode = this.exportTargetContextToJson();
     this.isEditing = true;
+  }
+
+  /**
+   * Exporta el targetContext a JSON
+   */
+  exportTargetContextToJson(): string {
+    // Si no hay contenedores, retornar objeto vacío
+    if (!this.targetContainers || this.targetContainers.length === 0) {
+      return JSON.stringify({ targetContext: {} }, null, 2);
+    }
+    
+    // Construir el objeto targetContext desde los contenedores y controles
+    const targetContext: any = {};
+    
+    // Agrupar contenedores por targetContextKey (sin instancia)
+    const containersByKey: { [key: string]: TargetContainer[] } = {};
+    
+    this.targetContainers.forEach(container => {
+      const baseKey = container.targetContextKey;
+      if (!containersByKey[baseKey]) {
+        containersByKey[baseKey] = [];
+      }
+      containersByKey[baseKey].push(container);
+    });
+    
+    // Procesar cada grupo de contenedores
+    Object.keys(containersByKey).forEach(baseKey => {
+      const containers = containersByKey[baseKey];
+      
+      // Si hay múltiples instancias, usar la sintaxis ::numeroinstancia
+      if (containers.length === 1) {
+        // Una sola instancia, usar la clave base
+        const container = containers[0];
+        const deepaliases: any = {};
+        
+        container.controls.forEach(control => {
+          if (control.data?.target && control.data?.path) {
+            deepaliases[control.data.target] = control.data.path;
+          }
+        });
+        
+        // Obtener el contexto original si existe
+        const originalContext = this.targetContextData?.[baseKey];
+        
+        if (originalContext && typeof originalContext === 'object') {
+          targetContext[baseKey] = {
+            ...originalContext,
+            FriendlyName: container.friendlyName,
+            deepaliases: deepaliases
+          };
+        } else {
+          targetContext[baseKey] = {
+            FriendlyName: container.friendlyName,
+            deepaliases: deepaliases
+          };
+        }
+      } else {
+        // Múltiples instancias, crear entradas con ::numeroinstancia
+        containers.forEach(container => {
+          const instanceKey = container.instanceNumber > 1 
+            ? `${baseKey}::${container.instanceNumber}` 
+            : baseKey;
+          
+          const deepaliases: any = {};
+          container.controls.forEach(control => {
+            if (control.data?.target && control.data?.path) {
+              deepaliases[control.data.target] = control.data.path;
+            }
+          });
+          
+          // Obtener el contexto original si existe (solo para la primera instancia)
+          const originalContext = container.instanceNumber === 1 
+            ? this.targetContextData?.[baseKey] 
+            : null;
+          
+          if (originalContext && typeof originalContext === 'object') {
+            targetContext[instanceKey] = {
+              ...originalContext,
+              FriendlyName: container.friendlyName,
+              deepaliases: deepaliases
+            };
+          } else {
+            targetContext[instanceKey] = {
+              FriendlyName: container.friendlyName,
+              deepaliases: deepaliases
+            };
+          }
+        });
+      }
+    });
+    
+    return JSON.stringify({ targetContext: targetContext }, null, 2);
   }
   
   // Método para activar/desactivar la cuadrícula
   toggleGrid(): void {
-    const canvas = this.elementRef.nativeElement.querySelector('.flow-canvas');
-    if (canvas) {
-      canvas.classList.toggle('grid-visible');
-    }
-  }
-  
-  // Métodos para el gestor de subflujos
-  toggleSubflowManager(): void {
-    this.toggleAccordion('subflows');
-  }
-  
-  filterSubflows(): void {
-    // Obtener todos los nodos de tipo subflujo
-    const allSubflows = this.flowNodes.filter(node => 
-      node.type === 'subflow' || (node.data && node.data.action === 'callSubflow')
-    );
-    
-    if (!this.subflowSearchTerm || this.subflowSearchTerm.trim() === '') {
-      this.filteredSubflows = allSubflows;
-    } else {
-      const searchTerm = this.subflowSearchTerm.toLowerCase();
-      this.filteredSubflows = allSubflows.filter(subflow => {
-        const label = (subflow.label || '').toLowerCase();
-        const name = ((subflow.data?.name) || '').toLowerCase();
-        const target = ((subflow.data?.target) || '').toLowerCase();
-        
-        return label.includes(searchTerm) || 
-               name.includes(searchTerm) || 
-               target.includes(searchTerm);
-      });
-    }
-    
-    // Si hay un subflujo seleccionado que ya no está en la lista filtrada, deseleccionarlo
-    if (this.selectedSubflow && !this.filteredSubflows.some(sf => sf.id === this.selectedSubflow?.id)) {
-      this.selectedSubflow = null;
-    }
-  }
-  
-  selectSubflow(subflow: FlowNode): void {
-    this.selectedSubflow = subflow;
-    
-    // También seleccionamos el nodo para mostrar sus propiedades en el panel inferior
-    this.selectNode(subflow);
-    
-    // Centrar el canvas en el subflujo seleccionado
-    setTimeout(() => {
-      this.centerOnNode(subflow);
-    }, 100);
-  }
-  
-  editSelectedSubflow(): void {
-    if (this.selectedSubflow) {
-      this.editingNodeId = this.selectedSubflow.id;
-      this.openNodeJsonEditor();
-    }
-  }
-  
-  // Métodos para el editor visual de subflujos
-  openSubflowEditor(): void {
-    if (!this.selectedSubflow) return;
-    
-    // Crear una copia del subflujo seleccionado para editar
-    this.editingSubflow = JSON.parse(JSON.stringify(this.selectedSubflow));
-    
-    // Asegurar que la estructura de datos es correcta
-    if (!this.editingSubflow.data) {
-      this.editingSubflow.data = {};
-    }
-    
-    // Asegurar que hay un array de acciones
-    if (!this.editingSubflow.data.actions) {
-      this.editingSubflow.data.actions = [];
-    }
-    
-    // Mostrar el editor
-    this.showSubflowEditor = true;
-  }
-  
-  closeSubflowEditor(): void {
-    this.showSubflowEditor = false;
-    this.editingSubflow = null;
-  }
-  
-  saveSubflowChanges(): void {
-    if (!this.editingSubflow || !this.selectedSubflow) return;
-    
-    // Actualizar el subflujo original con los cambios realizados
-    const index = this.flowNodes.findIndex(node => node.id === this.selectedSubflow!.id);
-    if (index !== -1) {
-      this.flowNodes[index] = this.editingSubflow;
-      this.selectedSubflow = this.editingSubflow;
-      
-      // Actualizar la lista filtrada
-      this.filterSubflows();
-    }
-    
-    // Cerrar el editor
-    this.closeSubflowEditor();
-  }
-  
-  addSubflowAction(): void {
-    if (!this.editingSubflow || !this.editingSubflow.data) return;
-    
-    // Añadir una nueva acción con valores por defecto
-    const newAction = {
-      action: 'click',
-      target: '',
-      value: ''
-    };
-    
-    if (!this.editingSubflow.data.actions) {
-      this.editingSubflow.data.actions = [];
-    }
-    
-    this.editingSubflow.data.actions.push(newAction);
-  }
-  
-  removeSubflowAction(index: number): void {
-    if (!this.editingSubflow || !this.editingSubflow.data || !this.editingSubflow.data.actions) return;
-    
-    // Eliminar la acción en el índice especificado
-    this.editingSubflow.data.actions.splice(index, 1);
-  }
-  
-  duplicateSelectedSubflow(): void {
-    if (!this.selectedSubflow) return;
-    
-    // Crear una copia del subflujo seleccionado
-    const originalSubflow = this.selectedSubflow;
-    const newSubflow: FlowNode = {
-      ...JSON.parse(JSON.stringify(originalSubflow)), // Deep copy
-      id: 'subflow_' + Date.now(), // Generar nuevo ID
-      x: originalSubflow.x + 50, // Desplazar ligeramente para visibilidad
-      y: originalSubflow.y + 50
-    };
-    
-    // Si tiene una etiqueta, añadir indicación de copia
-    if (newSubflow.label) {
-      newSubflow.label += ' (copia)';
-    }
-    
-    // Añadir el nuevo subflujo al flujo
-    this.flowNodes.push(newSubflow);
-    
-    // Seleccionar el nuevo subflujo
-    this.selectSubflow(newSubflow);
-    
-    // Actualizar la lista filtrada
-    this.filterSubflows();
-  }
-  
-  createNewSubflow(): void {
-    // Encontrar una posición adecuada para el nuevo subflujo
-    // Por defecto, lo colocamos en el centro del canvas visible
-    const canvas = this.elementRef.nativeElement.querySelector('.flow-canvas');
-    let x = 100, y = 100;
-    
-    if (canvas) {
-      const canvasRect = canvas.getBoundingClientRect();
-      x = (canvasRect.width / 2 - this.panOffsetX) / this.zoomLevel;
-      y = (canvasRect.height / 2 - this.panOffsetY) / this.zoomLevel;
-    }
-    
-    // Crear un nuevo subflujo
-    const newSubflow: FlowNode = {
-      id: 'subflow_' + Date.now(),
-      type: 'subflow',
-      label: 'Nuevo Subflujo',
-      x: Math.round(x),
-      y: Math.round(y),
-      data: {
-        action: 'callSubflow',
-        name: 'NuevoSubflujo',
-        description: 'Nuevo subflujo creado desde el gestor'
-      }
-    };
-    
-    // Añadir el nuevo subflujo al flujo
-    this.flowNodes.push(newSubflow);
-    
-    // Seleccionar el nuevo subflujo
-    this.selectSubflow(newSubflow);
-    
-    // Actualizar la lista filtrada
-    this.filterSubflows();
-    
-    // Abrir el editor de JSON para que el usuario pueda configurarlo
-    this.editSelectedSubflow();
+    this.showGrid = !this.showGrid;
   }
   
   centerOnNode(node: FlowNode): void {
@@ -941,49 +2211,5 @@ export class FlowEditorComponent implements OnInit {
         console.error('Error al cargar los tipos de controles:', error);
       }
     );
-  }
-  
-  // Método para activar/desactivar filtros por tipo de control
-  toggleControlTypeFilter(controlType: string): void {
-    const index = this.selectedControlTypes.indexOf(controlType);
-    
-    if (index === -1) {
-      // Añadir el tipo de control a los seleccionados
-      this.selectedControlTypes.push(controlType);
-    } else {
-      // Eliminar el tipo de control de los seleccionados
-      this.selectedControlTypes.splice(index, 1);
-    }
-    
-    // Aplicar los filtros
-    this.applyFilters();
-  }
-  
-  // Método para aplicar los filtros seleccionados
-  applyFilters(): void {
-    if (this.selectedControlTypes.length === 0) {
-      // Si no hay filtros seleccionados, mostrar todos los nodos
-      this.filteredFlowNodes = [...this.flowNodes];
-      this.isFilterActive = false;
-    } else {
-      // Filtrar los nodos por tipo de control
-      this.filteredFlowNodes = this.flowNodes.filter(node => {
-        // Si el nodo tiene un tipo de control específico en sus datos
-        if (node.data && node.data.controlType) {
-          return this.selectedControlTypes.includes(node.data.controlType);
-        }
-        return false;
-      });
-      this.isFilterActive = true;
-    }
-    
-    console.log('Nodos filtrados:', this.filteredFlowNodes.length);
-  }
-  
-  // Método para resetear los filtros
-  resetFilters(): void {
-    this.selectedControlTypes = [];
-    this.filteredFlowNodes = [...this.flowNodes];
-    this.isFilterActive = false;
   }
 } 
