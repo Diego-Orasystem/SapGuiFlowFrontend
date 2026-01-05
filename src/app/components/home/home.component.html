@@ -76,44 +76,10 @@
       </div>
     </div>
   </div>
-
-  <!-- Vista previa del archivo seleccionado -->
-  <div class="row mb-4" *ngIf="selectedFlow">
-    <div class="col-12">
-      <div class="card shadow-sm">
-        <div class="card-header bg-white">
-          <div class="d-flex align-items-center">
-            <i class="bi bi-file-earmark-text fs-4 text-primary me-2"></i>
-            <h5 class="card-title mb-0">Flujo Seleccionado</h5>
-          </div>
-        </div>
-        <div class="card-body">
-          <app-file-preview></app-file-preview>
-        </div>
-      </div>
-    </div>
-  </div>
   
   <div class="row">
     <div class="col-md-12">
       <app-flow-editor [jsonContent]="sapFlowJson"></app-flow-editor>
-    </div>
-  </div>
-  
-  <!-- Herramientas de exportación -->
-  <div class="row mt-4">
-    <div class="col-md-12">
-      <div class="card shadow-sm">
-        <div class="card-header bg-white">
-          <div class="d-flex align-items-center">
-            <i class="bi bi-download fs-4 text-primary me-2"></i>
-            <h5 class="card-title mb-0">Exportar Flujos</h5>
-          </div>
-        </div>
-        <div class="card-body">
-          <app-export-tools></app-export-tools>
-        </div>
-      </div>
     </div>
   </div>
   

@@ -1,0 +1,75 @@
+<div class="modal-overlay" *ngIf="show" (click)="onClose()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h5 class="modal-title">{{ title }}</h5>
+      <button type="button" class="btn-close" (click)="onClose()" aria-label="Cerrar"></button>
+    </div>
+    
+    <div class="modal-body">
+      <!-- Selector de tipo de período (solo si permite ambos) -->
+      <div *ngIf="periodType === 'both'" class="mb-3">
+        <label class="form-label">Tipo de Período:</label>
+        <div class="btn-group w-100" role="group">
+          <input type="radio" class="btn-check" id="periodMonth" [(ngModel)]="selectedPeriodType" value="month">
+          <label class="btn btn-outline-primary" for="periodMonth">Mensual</label>
+          
+          <input type="radio" class="btn-check" id="periodDay" [(ngModel)]="selectedPeriodType" value="day">
+          <label class="btn btn-outline-primary" for="periodDay">Por Día/Rango</label>
+        </div>
+      </div>
+
+      <!-- Selector de mes -->
+      <div *ngIf="selectedPeriodType === 'month'" class="mb-3">
+        <div class="row">
+          <div class="col-6">
+            <label class="form-label">Mes:</label>
+            <select class="form-select" [(ngModel)]="selectedMonth">
+              <option *ngFor="let month of getMonthOptions()" [value]="month">
+                {{ getMonthName(month) }}
+              </option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Año:</label>
+            <select class="form-select" [(ngModel)]="selectedYear">
+              <option *ngFor="let year of getYearOptions()" [value]="year">{{ year }}</option>
+            </select>
+          </div>
+        </div>
+        <div class="mt-2 text-muted small">
+          <i class="bi bi-info-circle me-1"></i>
+          Se sincronizará todo el mes seleccionado
+        </div>
+      </div>
+
+      <!-- Selector de rango de días -->
+      <div *ngIf="selectedPeriodType === 'day'" class="mb-3">
+        <div class="row">
+          <div class="col-6">
+            <label class="form-label">Fecha Inicio:</label>
+            <input type="date" class="form-control" [(ngModel)]="startDate" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Fecha Fin:</label>
+            <input type="date" class="form-control" [(ngModel)]="endDate" required>
+          </div>
+        </div>
+        <div class="mt-2 text-muted small">
+          <i class="bi bi-info-circle me-1"></i>
+          Seleccione el rango de fechas a sincronizar
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="onClose()">Cancelar</button>
+      <button type="button" class="btn btn-primary" (click)="onConfirm()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+
+
+
+
+

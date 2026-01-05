@@ -1,0 +1,425 @@
+<div class="container">
+  <h1>
+    <i class="bi bi-calendar-event me-2"></i>
+    Programador de Sincronización (Scheduler)
+  </h1>
+
+  <!-- Información sobre el módulo -->
+  <div class="info-box">
+    <p>
+      <strong>📅 Funcionalidad:</strong><br>
+      • Este módulo programa la ejecución automática de paquetes de sincronización para múltiples días<br>
+      • Opera en paralelo al módulo "Ejecutar Paquetes de Sincronización"<br>
+      • Consulta los posting dates faltantes desde la base de datos y genera un paquete por cada día pendiente<br>
+      • Ejecuta automáticamente todos los paquetes programados
+    </p>
+  </div>
+
+  <!-- Controles principales -->
+  <div class="controls-section">
+    <div class="control-group">
+      <label class="control-label">
+        <i class="bi bi-file-earmark-text me-1"></i>
+        Seleccionar Plantilla:
+      </label>
+      <div class="template-selector">
+        <button 
+          class="btn btn-secondary" 
+          (click)="loadTemplates()" 
+          [disabled]="loadingTemplates"
+          title="Recargar plantillas">
+          <i class="bi" [ngClass]="loadingTemplates ? 'bi-arrow-repeat spin' : 'bi-arrow-repeat'"></i>
+        </button>
+        <select 
+          class="form-select" 
+          [ngModel]="selectedTemplate"
+          (ngModelChange)="onTemplateChange($event)"
+          [disabled]="loadingTemplates || availableTemplates.length === 0">
+          <option [ngValue]="null">-- Seleccionar plantilla --</option>
+          <option *ngFor="let template of availableTemplates" [ngValue]="template">
+            {{ template.name }}
+          </option>
+        </select>
+      </div>
+      <div *ngIf="selectedTemplateData" class="template-info">
+        <span class="badge" [ngClass]="{
+          'bg-info': selectedTemplateData.type === 'SUMMARY_SYNC',
+          'bg-warning': selectedTemplateData.type === 'DETAILS_SYNC',
+          'bg-secondary': selectedTemplateData.type === 'CUSTOM'
+        }">
+          {{ selectedTemplateData.type }}
+        </span>
+        <span class="template-name">{{ selectedTemplateData.name }}</span>
+        <span class="template-forms">{{ selectedTemplateData.forms.length }} formulario(s)</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label class="control-label">
+        <i class="bi bi-calendar-check me-1"></i>
+        Posting Dates Pendientes:
+      </label>
+      <div class="posting-dates-section">
+        <div class="filters-row">
+          <div class="filter-item">
+            <label class="filter-label">Tablas (opcional):</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              [(ngModel)]="selectedTables"
+              placeholder="CJI3,KSB1,KOB1,MB51"
+              title="Separar por comas: CJI3,KSB1">
+          </div>
+          <button 
+            class="btn btn-primary" 
+            (click)="loadPendingPostingDates()" 
+            [disabled]="loadingPostingDates"
+            title="Recargar posting dates">
+            <i class="bi" [ngClass]="loadingPostingDates ? 'bi-arrow-repeat spin' : 'bi-arrow-repeat'"></i>
+            Recargar
+          </button>
+        </div>
+        
+        <!-- Resumen -->
+        <div *ngIf="postingDatesSummary" class="posting-dates-info">
+          <div class="info-item">
+            <strong>Total de paquetes necesarios:</strong>
+            <span class="badge bg-warning">{{ postingDatesSummary.total_packages_needed }}</span>
+          </div>
+          <div class="info-item">
+            <strong>Días únicos pendientes:</strong>
+            <span class="badge bg-info">{{ pendingPostingDates.length }}</span>
+          </div>
+          <div *ngIf="postingDatesSummary && postingDatesSummary.by_table && getTableKeys(postingDatesSummary.by_table).length > 0" class="info-item">
+            <strong>Por tabla:</strong>
+            <span *ngFor="let table of getTableKeys(postingDatesSummary.by_table)" class="table-badge">
+              {{ table }}: {{ postingDatesSummary.by_table[table] }}
+            </span>
+          </div>
+        </div>
+
+
+        <!-- Lista simple de fechas -->
+        <div *ngIf="pendingPostingDates.length > 0" class="pending-dates-list">
+          <h5>Todas las Fechas Únicas Pendientes:</h5>
+          <div class="dates-grid">
+            <div *ngFor="let date of pendingPostingDates" class="date-badge">
+              {{ formatDate(date) }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="action-buttons">
+      <button 
+        class="btn btn-success" 
+        (click)="createDatePackages()" 
+        [disabled]="!selectedTemplateData || pendingPostingDates.length === 0"
+        title="Crear pestañas para previsualizar y editar archivos .sqpr">
+        <i class="bi bi-file-earmark-plus me-1"></i>
+        Crear Pestañas de Preview
+      </button>
+      <button 
+        class="btn btn-primary" 
+        (click)="saveAllFiles()" 
+        [disabled]="datePackages.length === 0 || isSaving"
+        title="Guardar todos los archivos .sqpr en conjunto">
+        <i class="bi bi-save me-1"></i>
+        Guardar Todos los Archivos
+      </button>
+      <button 
+        class="btn btn-info" 
+        (click)="toggleExecutionPanel()" 
+        [class.active]="showExecutionPanel"
+        title="Mostrar/ocultar panel de ejecución">
+        <i class="bi" [ngClass]="showExecutionPanel ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+        Panel de Logs
+      </button>
+    </div>
+  </div>
+
+  <!-- Pestañas de Posting Dates -->
+  <div *ngIf="datePackages.length > 0" class="date-packages-section">
+    <div class="packages-tabs">
+      <div *ngFor="let pkg of datePackages" 
+           class="package-tab" 
+           [class.active]="currentDatePackageId === pkg.id">
+        <span (click)="selectDatePackage(pkg.id)">
+          {{ formatDate(pkg.postingDate) }}
+          <small class="form-count">({{ pkg.forms.length }} archivo{{ pkg.forms.length > 1 ? 's' : '' }})</small>
+        </span>
+      </div>
+    </div>
+
+    <div class="package-content">
+      <div *ngIf="getCurrentDatePackage()" class="date-package-view">
+        <div class="package-header">
+          <h3>
+            <i class="bi bi-calendar-event me-2"></i>
+            Posting Date: {{ formatDate(getCurrentDatePackage()!.postingDate) }}
+          </h3>
+          <p class="package-info">
+            Se generarán {{ getCurrentDatePackage()!.forms.length }} archivo(s) .sqpr para esta fecha
+          </p>
+        </div>
+
+        <!-- Pestañas de formularios dentro de cada posting_date -->
+        <div *ngIf="getCurrentDatePackage()!.forms.length > 0" class="forms-tabs">
+          <div *ngFor="let form of getCurrentDatePackage()!.forms" 
+               class="form-tab" 
+               [class.active]="currentFormId === form.id">
+            <span (click)="selectForm(form.id)">{{ form.formName }}</span>
+            <button class="btn-reset" (click)="resetFormData(form.id); $event.stopPropagation()" title="Restaurar valores originales">
+              <i class="bi bi-arrow-counterclockwise"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Preview y edición del formulario actual -->
+        <div *ngIf="getCurrentForm()" class="form-preview-section">
+          <div class="form-preview-header">
+            <h4>
+              <i class="bi bi-file-earmark-code me-2"></i>
+              {{ getCurrentForm()!.formName }}
+            </h4>
+            <div class="form-preview-info">
+              <span class="file-name-badge">
+                <i class="bi bi-file-earmark me-1"></i>
+                {{ getCurrentForm()!.fileName }}
+              </span>
+            </div>
+          </div>
+
+          <div class="form-preview-content">
+            <div class="json-editor-section">
+              <div class="editor-header">
+                <strong>Datos del Archivo .sqpr (Editable):</strong>
+                <button class="btn btn-sm btn-secondary" (click)="resetFormData(getCurrentForm()!.id)">
+                  <i class="bi bi-arrow-counterclockwise me-1"></i>
+                  Restaurar Original
+                </button>
+              </div>
+              <div class="json-editor">
+                <textarea 
+                  class="json-textarea"
+                  [(ngModel)]="getCurrentForm()!.formDataJson"
+                  (ngModelChange)="onFormDataChange(getCurrentForm()!.id, $event)"
+                  rows="20"
+                  spellcheck="false"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel de ejecución -->
+  <div *ngIf="showExecutionPanel" class="execution-panel">
+    <div class="panel-header">
+      <h3>
+        <i class="bi bi-activity me-2"></i>
+        Estado de Ejecución
+      </h3>
+      <div class="panel-actions">
+        <button class="btn btn-sm btn-secondary" (click)="clearLogs()" title="Limpiar logs">
+          <i class="bi bi-trash me-1"></i>
+          Limpiar
+        </button>
+        <button class="btn btn-sm btn-secondary" (click)="exportLogs()" title="Exportar logs">
+          <i class="bi bi-download me-1"></i>
+          Exportar
+        </button>
+      </div>
+    </div>
+
+    <!-- Resumen de guardado -->
+    <div *ngIf="datePackages.length > 0" class="execution-summary">
+      <div class="summary-item">
+        <span class="summary-label">Total de Fechas:</span>
+        <span class="summary-value">{{ datePackages.length }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Total de Archivos:</span>
+        <span class="summary-value">{{ getTotalFilesCount() }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Guardados:</span>
+        <span class="summary-value text-success">{{ savedFiles.length }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Errores:</span>
+        <span class="summary-value text-danger">{{ failedFiles.length }}</span>
+      </div>
+      <div *ngIf="isSaving" class="summary-item">
+        <span class="summary-label">Estado:</span>
+        <span class="summary-value text-info">Guardando...</span>
+      </div>
+    </div>
+
+    <!-- Logs de ejecución -->
+    <div class="execution-logs">
+      <h4>Logs de Ejecución:</h4>
+      <div class="logs-container">
+        <div *ngFor="let log of executionLogs" class="log-entry" [ngClass]="{
+          'log-info': log.type === 'info',
+          'log-success': log.type === 'success',
+          'log-warning': log.type === 'warning',
+          'log-error': log.type === 'error'
+        }">
+          <span class="log-time">{{ log.timestamp | date:'HH:mm:ss' }}</span>
+          <span class="log-type" [ngClass]="{
+            'badge-info': log.type === 'info',
+            'badge-success': log.type === 'success',
+            'badge-warning': log.type === 'warning',
+            'badge-error': log.type === 'error'
+          }">
+            {{ log.type.toUpperCase() }}
+          </span>
+          <span class="log-message">{{ log.message }}</span>
+        </div>
+        <div *ngIf="executionLogs.length === 0" class="no-logs">
+          No hay logs disponibles
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estado vacío -->
+  <div *ngIf="!selectedTemplateData && !loadingTemplates" class="empty-state">
+    <i class="bi bi-calendar-x display-4 text-muted mb-3"></i>
+    <h2>Selecciona una Plantilla</h2>
+    <p>Para comenzar, selecciona una plantilla de sincronización desde el selector superior.</p>
+  </div>
+
+  <!-- Loading state -->
+  <div *ngIf="loadingTemplates || loadingPostingDates" class="loading-state">
+    <div class="spinner"></div>
+    <p>Cargando...</p>
+  </div>
+
+  <!-- Sección de Desarrollo - Prueba de APIs -->
+  <div class="dev-section">
+    <div class="dev-header" (click)="toggleDevSection()">
+      <h3>
+        <i class="bi" [ngClass]="showDevSection ? 'bi-chevron-down' : 'bi-chevron-right'"></i>
+        <i class="bi bi-code-slash me-2"></i>
+        Herramientas de Desarrollo - Prueba de APIs
+      </h3>
+    </div>
+    
+    <div *ngIf="showDevSection" class="dev-content">
+      <div class="dev-info">
+        <p><strong>🔧 Esta sección es solo para desarrollo y testing de las APIs del scheduler.</strong></p>
+        <p>Permite probar los endpoints directamente y ver las respuestas en formato JSON.</p>
+      </div>
+
+      <!-- Prueba de Posting Dates -->
+      <div class="dev-api-section">
+        <h4>
+          <i class="bi bi-calendar-event me-2"></i>
+          GET /api/scheduler/posting-dates
+        </h4>
+        <div class="api-controls">
+          <div class="api-param">
+            <label>Tablas (opcional, separadas por comas):</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              [(ngModel)]="devApiParams.tables"
+              placeholder="CJI3,KSB1,KOB1,MB51">
+          </div>
+          <button 
+            class="btn btn-primary" 
+            (click)="testPostingDatesApi()"
+            [disabled]="devApiLoading.postingDates">
+            <i class="bi" [ngClass]="devApiLoading.postingDates ? 'bi-arrow-repeat spin' : 'bi-play-fill'"></i>
+            Probar API
+          </button>
+        </div>
+        <div *ngIf="devApiResults.postingDates" class="api-result">
+          <div class="result-header">
+            <strong>Respuesta:</strong>
+            <button class="btn btn-sm btn-secondary" (click)="copyToClipboard(devApiResults.postingDates)">
+              <i class="bi bi-clipboard me-1"></i> Copiar JSON
+            </button>
+          </div>
+          <pre class="json-preview">{{ formatJson(devApiResults.postingDates) }}</pre>
+        </div>
+      </div>
+
+      <!-- Prueba de Summary -->
+      <div class="dev-api-section">
+        <h4>
+          <i class="bi bi-bar-chart me-2"></i>
+          GET /api/scheduler/posting-dates/summary
+        </h4>
+        <div class="api-controls">
+          <div class="api-param">
+            <label>Tablas (opcional, separadas por comas):</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              [(ngModel)]="devApiParams.summaryTables"
+              placeholder="CJI3,KSB1,KOB1,MB51">
+          </div>
+          <button 
+            class="btn btn-primary" 
+            (click)="testSummaryApi()"
+            [disabled]="devApiLoading.summary">
+            <i class="bi" [ngClass]="devApiLoading.summary ? 'bi-arrow-repeat spin' : 'bi-play-fill'"></i>
+            Probar API
+          </button>
+        </div>
+        <div *ngIf="devApiResults.summary" class="api-result">
+          <div class="result-header">
+            <strong>Respuesta:</strong>
+            <button class="btn btn-sm btn-secondary" (click)="copyToClipboard(devApiResults.summary)">
+              <i class="bi bi-clipboard me-1"></i> Copiar JSON
+            </button>
+          </div>
+          <pre class="json-preview">{{ formatJson(devApiResults.summary) }}</pre>
+        </div>
+      </div>
+
+      <!-- Información de la API -->
+      <div class="dev-api-info">
+        <h4>
+          <i class="bi bi-info-circle me-2"></i>
+          Información de la API
+        </h4>
+        <div class="info-grid">
+          <div class="info-item">
+            <strong>Base URL:</strong>
+            <code>http://localhost:3000/api/scheduler</code>
+          </div>
+          <div class="info-item">
+            <strong>Endpoints disponibles:</strong>
+            <ul>
+              <li><code>GET /posting-dates</code> - Obtiene posting dates faltantes</li>
+              <li><code>GET /posting-dates/summary</code> - Obtiene resumen de posting dates</li>
+            </ul>
+          </div>
+          <div class="info-item">
+            <strong>Parámetros:</strong>
+            <ul>
+              <li><code>tables</code> (opcional): String separado por comas (ej: "CJI3,KSB1")</li>
+              <li><code>format</code> (opcional): "detailed" | "simple"</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Limpiar resultados -->
+      <div class="dev-actions">
+        <button class="btn btn-secondary" (click)="clearDevResults()">
+          <i class="bi bi-trash me-1"></i>
+          Limpiar Resultados
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+

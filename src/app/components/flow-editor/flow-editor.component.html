@@ -12,6 +12,14 @@
       <button class="btn btn-sm btn-outline-light me-2" (click)="toggleFullscreen()" [title]="isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'">
         <i class="bi" [ngClass]="isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'"></i>
       </button>
+      <button class="btn btn-sm btn-outline-light me-2" (click)="toggleTargetsJsonModal()" [title]="'Previsualizar JSON de targets'">
+        <i class="bi bi-filetype-json"></i>
+        Targets JSON
+      </button>
+      <button class="btn btn-sm btn-outline-light me-2" (click)="toggleDebugPanel()" [class.active]="showDebugPanel" [title]="showDebugPanel ? 'Ocultar panel de debugging' : 'Mostrar panel de debugging'">
+        <i class="bi" [ngClass]="showDebugPanel ? 'bi-bug-fill' : 'bi-bug'"></i>
+        <span *ngIf="validationResult && !validationResult.isValid" class="badge bg-danger ms-1">{{ validationResult.errors.length }}</span>
+      </button>
       <button class="btn btn-sm btn-outline-light me-2" (click)="saveChanges()" [disabled]="flowNodes.length === 0">
         <i class="bi bi-save me-1"></i> Guardar
       </button>
@@ -83,41 +91,62 @@
         
         <!-- Flechas de conexión entre contenedores -->
         <svg class="container-connections-layer" 
-             style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; pointer-events: none; z-index: 1;">
-          <path *ngFor="let conn of containerConnections" 
+             [attr.width]="10000"
+             [attr.height]="10000"
+             style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 6; overflow: visible;">
+          <defs>
+            <!-- Definición de marcadores para las flechas -->
+            <marker id="container-arrowhead" 
+                    markerWidth="12" 
+                    markerHeight="10" 
+                    refX="10" 
+                    refY="5" 
+                    orient="auto"
+                    markerUnits="userSpaceOnUse">
+              <polygon points="0 0, 12 5, 0 10" fill="#0d6efd" stroke="#0d6efd" stroke-width="1" />
+            </marker>
+          </defs>
+          <path *ngFor="let conn of containerConnections; trackBy: trackByConnection" 
                 [attr.d]="getPathForContainerConnection(conn.sourceId, conn.targetId)"
                 class="container-connection-path"
                 stroke="#0d6efd"
-                stroke-width="3"
+                stroke-width="4"
                 fill="none"
                 marker-end="url(#container-arrowhead)">
           </path>
-          
-          <!-- Definición de marcadores para las flechas -->
-          <defs>
-            <marker id="container-arrowhead" 
-                    markerWidth="10" 
-                    markerHeight="7" 
-                    refX="9" 
-                    refY="3.5" 
-                    orient="auto">
-              <polygon points="0 0, 10 3.5, 0 7" fill="#0d6efd" />
-            </marker>
-          </defs>
         </svg>
         
         <!-- Contenedores de Targets -->
         <div *ngFor="let container of targetContainers" 
              class="target-container"
              [class.selected]="selectedContainer?.id === container.id"
+             [class.dragging]="draggedContainer?.id === container.id"
+             [class.drag-over-container]="dragOverContainer?.id === container.id && draggedContainer?.id !== container.id"
+             [class.has-errors]="hasContainerErrors(container.fullKey)"
              [ngClass]="container.colorClass"
              [style.left.px]="container.x" 
              [style.top.px]="container.y"
              [style.width.px]="container.width"
              [style.height.px]="container.height"
-             draggable="true"
-             (dragstart)="onContainerDragStart($event, container)"
              (click)="selectContainer(container)">
+          
+          <!-- Header del contenedor (solo el header es draggable para mover el contenedor) -->
+          <div class="target-container-header"
+               draggable="true"
+               (dragstart)="onContainerDragStart($event, container)"
+               (dragover)="onContainerDragOver($event, container)"
+               (dragleave)="onContainerDragLeave($event)"
+               (drop)="onContainerDrop($event, container)"
+               (click)="$event.stopPropagation()">
+            <span class="container-title">{{container.friendlyName || container.fullKey || container.targetContextKey}}</span>
+            <span class="container-key" *ngIf="container.fullKey && container.fullKey !== container.friendlyName">({{container.fullKey}})</span>
+            <!-- Indicador de errores -->
+            <span *ngIf="hasContainerErrors(container.fullKey)" 
+                  class="badge bg-danger ms-2" 
+                  [title]="getContainerErrors(container.fullKey).join('\n')">
+              <i class="bi bi-exclamation-triangle"></i> {{ getContainerErrors(container.fullKey).length }}
+            </span>
+          </div>
           
           <!-- Botón de eliminar contenedor (flotante) -->
           <button class="container-delete-btn" 
@@ -127,14 +156,23 @@
           </button>
           
           <!-- Controles dentro del contenedor -->
-          <div class="target-container-body">
-            <div *ngFor="let control of container.controls" 
+          <div class="target-container-body"
+               (dragover)="onContainerBodyDragOver($event, container)"
+               (drop)="onContainerBodyDrop($event, container)"
+               (dragenter)="onContainerBodyDragEnter($event, container)"
+               (dragleave)="onContainerBodyDragLeave($event)">
+            <div *ngFor="let control of container.controls; let i = index" 
                  class="control-node" 
                  [class.selected]="selectedTargetContextNode?.id === control.id"
+                 [class.dragging]="draggedControl?.id === control.id"
+                 [class.drag-over]="dragOverControl?.id === control.id && draggedControlContainer?.id === container.id"
                  [style.left.px]="control.x - container.x" 
                  [style.top.px]="control.y - container.y"
                  draggable="true"
-                 (dragstart)="onNodeDragStart($event, control)"
+                 (dragstart)="onControlDragStart($event, control, container)"
+                 (dragover)="onControlDragOver($event, control, container, i)"
+                 (dragleave)="onControlDragLeave($event)"
+                 (drop)="onControlDrop($event, control, container, i)"
                  (click)="selectTargetContextNode(control); $event.stopPropagation()">
               <div class="control-node-header">
                 <i class="bi me-1" [ngClass]="getControlIcon(control.data?.controlType || '')"></i>
@@ -213,8 +251,8 @@
         </div>
         <div class="accordion-body" [ngClass]="{'show': accordionState['buttons']}">
           <div class="d-grid gap-2">
-            <button class="btn btn-sm btn-outline-primary" (click)="viewFullJson()" [disabled]="targetContainers.length === 0">
-              <i class="bi bi-code-slash me-1"></i> Ver JSON
+            <button class="btn btn-sm btn-outline-primary" (click)="viewFullJson()" [disabled]="!flowData && !targetContextData">
+              <i class="bi bi-code-slash me-1"></i> Editar JSON Completo
             </button>
             <button class="btn btn-sm btn-outline-secondary" (click)="autoArrangeNodes()" [disabled]="flowNodes.length === 0">
               <i class="bi bi-grid-3x3 me-1"></i> Organizar Flujo
@@ -247,7 +285,7 @@
             <i class="bi bi-info-circle me-1"></i>
             No se encontraron Target Context para este flujo.
             <br>
-            <small>Directorio: ~/lek-files/can/sap-config/sap-gui-flow/sap-targets$</small>
+            <small>Directorio: ~/lek-files-dev/can/sap-config/sap-gui-flow/sap-targets$</small>
           </div>
           
           <div *ngIf="!loadingTargets && currentFlowFileName && availableTargets.length > 0">
@@ -275,7 +313,7 @@
               
               <div *ngIf="!loadingControls && targetContextControls.length === 0" class="text-center text-muted small py-2">
                 <i class="bi bi-inbox me-1"></i>
-                No se encontraron controles manipulables
+                No se encontraron controles
               </div>
               
               <div *ngIf="!loadingControls && targetContextControls.length > 0">
@@ -374,26 +412,289 @@
   </div>
 </div>
 
-<!-- Modal para ver el JSON completo -->
-<div class="modal" [class.show]="isEditing" tabindex="-1" role="dialog" aria-hidden="true">
+<!-- Modal para seleccionar T-Code en flujo en blanco -->
+<div class="modal" [class.show]="showTcodeSelector" [style.display]="showTcodeSelector ? 'block' : 'none'" [style.z-index]="showTcodeSelector ? '10050' : 'auto'" tabindex="-1" role="dialog" [attr.aria-hidden]="!showTcodeSelector">
+  <div class="modal-backdrop" *ngIf="showTcodeSelector" (click)="cancelTcodeSelection()"></div>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-white" *ngIf="showTcodeSelector">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-list-ul me-2"></i>
+          Seleccionar T-Code
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cancelTcodeSelection()"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted mb-3">El flujo está en blanco. Por favor seleccione un T-Code para cargar los targets correspondientes:</p>
+        <div class="mb-3">
+          <label class="form-label">T-Code:</label>
+          <div *ngIf="loadingTcodes" class="text-center py-3">
+            <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+              <span class="visually-hidden">Cargando...</span>
+            </div>
+            <span class="text-muted">Cargando T-Codes disponibles...</span>
+          </div>
+          <select *ngIf="!loadingTcodes" class="form-select bg-dark text-white border-secondary" [(ngModel)]="selectedTcodeForBlankFlow" [disabled]="availableTcodes.length === 0">
+            <option value="">-- Seleccione un T-Code --</option>
+            <option *ngFor="let tcode of availableTcodes" [value]="tcode">{{ tcode }}</option>
+          </select>
+          <div *ngIf="!loadingTcodes && availableTcodes.length === 0" class="alert alert-warning mt-2">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            No se encontraron archivos de targets disponibles. Verifique la conexión con el servidor SFTP.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-light" (click)="cancelTcodeSelection()">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="confirmTcodeSelection()" [disabled]="!selectedTcodeForBlankFlow">
+          <i class="bi bi-check-circle me-1"></i> Continuar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para editar el JSON completo -->
+<div class="modal" [class.show]="isEditing" [style.display]="isEditing ? 'block' : 'none'" [style.z-index]="isEditing ? '10000' : 'auto'" tabindex="-1" role="dialog" [attr.aria-hidden]="!isEditing">
   <div class="modal-backdrop" *ngIf="isEditing" (click)="cancelEditing()"></div>
-  <div class="modal-dialog modal-lg modal-dialog-centered">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content bg-dark text-white" *ngIf="isEditing">
       <div class="modal-header">
         <h5 class="modal-title">
           <i class="bi bi-code-square me-2"></i>
-          JSON del Target Context
+          Editar JSON del Flujo Completo
         </h5>
         <button type="button" class="btn-close btn-close-white" (click)="cancelEditing()"></button>
       </div>
       <div class="modal-body p-0">
         <div class="json-editor-container">
-          <pre class="json-viewer">{{flowCode}}</pre>
+          <textarea 
+            class="form-control json-editor" 
+            [(ngModel)]="flowCode" 
+            rows="25"
+            spellcheck="false"
+            [placeholder]="getJsonEditorPlaceholder()"></textarea>
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline-light" (click)="cancelEditing()">Cerrar</button>
+        <button type="button" class="btn btn-outline-light" (click)="cancelEditing()">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="saveEditedJson()" [disabled]="isSaving">
+          <span *ngIf="!isSaving">
+            <i class="bi bi-save me-1"></i> Guardar cambios
+          </span>
+          <span *ngIf="isSaving">
+            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            Guardando...
+          </span>
+        </button>
       </div>
     </div>
   </div>
 </div>
+
+<!-- Panel de Debugging y Validación -->
+<div class="debug-panel" [class.open]="showDebugPanel" *ngIf="showDebugPanel">
+  <div class="debug-panel-header">
+    <h5 class="mb-0">
+      <i class="bi bi-bug me-2"></i>
+      Panel de Debugging y Validación
+    </h5>
+    <button class="btn btn-sm btn-outline-light" (click)="toggleDebugPanel()">
+      <i class="bi bi-x"></i>
+    </button>
+  </div>
+  
+  <div class="debug-panel-body">
+    <!-- Resumen de estadísticas -->
+    <div class="debug-section mb-3">
+      <h6 class="text-primary">
+        <i class="bi bi-bar-chart me-2"></i>
+        Estadísticas del Flujo
+      </h6>
+      <div class="row g-2">
+        <div class="col-6">
+          <div class="stat-card">
+            <div class="stat-value">{{ getFlowStatistics().containers }}</div>
+            <div class="stat-label">Contenedores</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="stat-card">
+            <div class="stat-value">{{ getFlowStatistics().controls }}</div>
+            <div class="stat-label">Controles</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="stat-card">
+            <div class="stat-value">{{ getFlowStatistics().steps }}</div>
+            <div class="stat-label">Steps</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="stat-card">
+            <div class="stat-value">{{ getFlowStatistics().targetContainers }}</div>
+            <div class="stat-label">Contenedores Visuales</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Resultado de validación -->
+    <div class="debug-section mb-3" *ngIf="validationResult">
+      <h6 [ngClass]="{
+        'text-danger': !validationResult.isValid,
+        'text-warning': validationResult.isValid && validationResult.warnings.length > 0,
+        'text-success': validationResult.isValid && validationResult.warnings.length === 0
+      }">
+        <i class="bi me-2" [ngClass]="{
+          'bi-x-circle': !validationResult.isValid,
+          'bi-exclamation-triangle': validationResult.isValid && validationResult.warnings.length > 0,
+          'bi-check-circle': validationResult.isValid && validationResult.warnings.length === 0
+        }"></i>
+        Validación del Flujo
+        <span class="badge ms-2" [ngClass]="{
+          'bg-danger': !validationResult.isValid,
+          'bg-warning': validationResult.isValid && validationResult.warnings.length > 0,
+          'bg-success': validationResult.isValid && validationResult.warnings.length === 0
+        }">
+          {{ validationResult.isValid ? 'Válido' : 'Inválido' }}
+        </span>
+      </h6>
+      
+      <!-- Errores -->
+      <div *ngIf="validationResult.errors.length > 0" class="alert alert-danger">
+        <strong>Errores ({{ validationResult.errors.length }}):</strong>
+        <ul class="mb-0 mt-2">
+          <li *ngFor="let error of validationResult.errors">
+            <span *ngIf="error.container" class="badge bg-secondary me-1">{{ error.container }}</span>
+            <span *ngIf="error.step" class="badge bg-info me-1">{{ error.step }}</span>
+            {{ error.message }}
+          </li>
+        </ul>
+      </div>
+      
+      <!-- Advertencias -->
+      <div *ngIf="validationResult.warnings.length > 0" class="alert alert-warning">
+        <strong>Advertencias ({{ validationResult.warnings.length }}):</strong>
+        <ul class="mb-0 mt-2">
+          <li *ngFor="let warning of validationResult.warnings.slice(0, 10)">
+            <span *ngIf="warning.container" class="badge bg-secondary me-1">{{ warning.container }}</span>
+            <span *ngIf="warning.step" class="badge bg-info me-1">{{ warning.step }}</span>
+            {{ warning.message }}
+          </li>
+          <li *ngIf="validationResult.warnings.length > 10" class="text-muted">
+            ... y {{ validationResult.warnings.length - 10 }} advertencia(s) más
+          </li>
+        </ul>
+      </div>
+      
+      <!-- Resumen de validación -->
+      <div class="mt-2">
+        <small class="text-muted">
+          <strong>Resumen:</strong>
+          Contenedores: {{ validationResult.summary.totalContainers }},
+          Steps: {{ validationResult.summary.totalSteps }},
+          Controles: {{ validationResult.summary.totalControls }},
+          Conexiones faltantes: {{ validationResult.summary.missingConnections }},
+          Nombres duplicados: {{ validationResult.summary.duplicateNames }}
+        </small>
+      </div>
+    </div>
+    
+    <!-- Vista previa del JSON -->
+    <div class="debug-section mb-3">
+      <h6 class="text-info">
+        <i class="bi bi-code-square me-2"></i>
+        Vista Previa del JSON
+        <button class="btn btn-sm btn-outline-light ms-2" (click)="jsonPreview = exportFlowToJson()">
+          <i class="bi bi-arrow-clockwise"></i> Actualizar
+        </button>
+      </h6>
+      <div class="json-preview-container">
+        <pre class="json-preview">{{ jsonPreview || 'No hay JSON para mostrar' }}</pre>
+      </div>
+    </div>
+    
+    <!-- Comparación antes/después -->
+    <div class="debug-section mb-3" *ngIf="jsonBeforeSave && jsonAfterSave">
+      <h6 class="text-warning">
+        <i class="bi bi-arrow-left-right me-2"></i>
+        Comparación Antes/Después
+      </h6>
+      <div class="alert alert-info">
+        <pre class="mb-0" style="white-space: pre-wrap; font-size: 0.85rem;">{{ compareJsonBeforeAfter() }}</pre>
+      </div>
+    </div>
+    
+    <!-- Logs de debugging -->
+    <div class="debug-section">
+      <h6 class="text-secondary">
+        <i class="bi bi-list-ul me-2"></i>
+        Logs de Operaciones
+        <button class="btn btn-sm btn-outline-light ms-2" (click)="clearDebugLogs()">
+          <i class="bi bi-trash"></i> Limpiar
+        </button>
+        <button class="btn btn-sm btn-outline-light ms-1" (click)="exportDebugLogs()">
+          <i class="bi bi-download"></i> Exportar
+        </button>
+      </h6>
+      <div class="debug-logs-container">
+        <div *ngFor="let log of debugLogs.slice().reverse().slice(0, 50)" 
+             class="debug-log-item"
+             [ngClass]="{
+               'log-error': log.type === 'error',
+               'log-warning': log.type === 'warning',
+               'log-info': log.type === 'info'
+             }">
+          <div class="log-header">
+            <span class="log-time">{{ log.timestamp | date:'HH:mm:ss' }}</span>
+            <span class="badge ms-2" [ngClass]="{
+              'bg-danger': log.type === 'error',
+              'bg-warning text-dark': log.type === 'warning',
+              'bg-info': log.type === 'info'
+            }">{{ log.type.toUpperCase() }}</span>
+          </div>
+          <div class="log-message">{{ log.message }}</div>
+          <div *ngIf="log.data" class="log-data">
+            <pre>{{ getLogDataString(log.data) }}</pre>
+          </div>
+        </div>
+        <div *ngIf="debugLogs.length === 0" class="text-muted text-center py-3">
+          No hay logs disponibles
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para previsualizar JSON de Targets -->
+<div class="modal fade" [class.show]="showTargetsJsonModal" [style.display]="showTargetsJsonModal ? 'block' : 'none'" tabindex="-1" *ngIf="showTargetsJsonModal" [style.background-color]="'rgba(0,0,0,0.5)'">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header border-bottom border-secondary">
+        <h5 class="modal-title text-info">
+          <i class="bi bi-file-earmark-code me-2"></i>JSON de Targets Cargados
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="toggleTargetsJsonModal()" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div *ngIf="targetsJsonData; else noTargets" class="json-preview-container">
+          <pre class="text-white bg-black p-3 rounded" style="max-height: 70vh; overflow-y: auto; font-size: 12px;">{{ getTargetsJsonString() }}</pre>
+        </div>
+        <ng-template #noTargets>
+          <p class="text-muted text-center py-5">
+            <i class="bi bi-info-circle display-4 d-block mb-3"></i>
+            No hay datos de targets cargados.
+          </p>
+        </ng-template>
+      </div>
+      <div class="modal-footer border-top border-secondary">
+        <button type="button" class="btn btn-secondary" (click)="toggleTargetsJsonModal()">Cerrar</button>
+        <button type="button" class="btn btn-primary" (click)="copyTargetsJson()" [disabled]="!targetsJsonData">
+          <i class="bi bi-clipboard me-1"></i> Copiar JSON
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div *ngIf="showTargetsJsonModal" class="modal-backdrop fade show"></div>

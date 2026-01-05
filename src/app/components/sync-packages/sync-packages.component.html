@@ -2,6 +2,36 @@
   <h1>Paquetes de Sincronización</h1>
 
   <div id="packagesContainer">
+    <!-- Información sobre directorios -->
+    <div style="margin-bottom: 20px; padding: 12px; background: #1a2332; border-radius: 6px; border-left: 4px solid #17a2b8;">
+      <p style="color: #b0c4de; margin: 0; font-size: 13px;">
+        <strong>📁 Flujo de trabajo:</strong><br>
+        • <strong>Plantillas:</strong> Se editan en el módulo "Editor de Plantillas" (~/lek-files-dev/can/sap-config/sap-query-package$)<br>
+        • <strong>Este módulo:</strong> Carga plantillas y crea archivos de parámetros (.sqpr) con fechas específicas<br>
+        • <strong>Archivos finales:</strong> Se guardan en ~/lek-files-dev/can/sap-queries$ (instancias con fechas)
+      </p>
+    </div>
+
+    <!-- Botones para cargar plantillas y crear instancias -->
+    <div style="display: flex; gap: 10px; margin-bottom: 20px; padding: 15px; background: #0f1626; border-radius: 6px; border: 1px solid #2a3a5c;">
+      <button class="btn" style="background: #17a2b8; color: white; flex: 1;" (click)="openSummarySyncModal()" title="Cargar plantilla SUMMARY_SYNC y crear archivo de parámetros con fechas">
+        <i class="bi bi-file-earmark-arrow-down me-1"></i>
+        Cargar Plantilla SUMMARY_SYNC y Crear Archivo
+      </button>
+      <button class="btn" style="background: #ffc107; color: #000; flex: 1;" (click)="openDetailsSyncModal()" title="Cargar plantilla DETAILS_SYNC y crear archivos de parámetros con fechas">
+        <i class="bi bi-file-earmark-arrow-down me-1"></i>
+        Cargar Plantilla DETAILS_SYNC y Crear Archivos
+      </button>
+      <button class="btn" style="background: #28a745; color: white; flex: 1;" (click)="openCustomTemplateModal()" title="Cargar una plantilla personalizada y crear archivos de parámetros con fechas">
+        <i class="bi bi-file-earmark-plus me-1"></i>
+        Cargar Plantilla Personalizada
+      </button>
+      <button class="btn" style="background: #6c757d; color: white;" (click)="toggleExecutionPanel()" [class.active]="showExecutionPanel" [title]="showExecutionPanel ? 'Ocultar panel de ejecución' : 'Mostrar panel de ejecución'">
+        <i class="bi" [ngClass]="showExecutionPanel ? 'bi-activity' : 'bi-activity'"></i>
+        <span *ngIf="validationResult && !validationResult.isValid" class="badge bg-danger ms-1">{{ validationResult.errors.length }}</span>
+      </button>
+    </div>
+
     <div class="packages-tabs">
       <button class="btn-add-package" (click)="showCreatePackageModalDialog()" title="Agregar nuevo paquete">+</button>
       <div *ngFor="let pkg of packages" 
@@ -16,15 +46,18 @@
     <div class="package-content">
       <div *ngIf="loadingPackages" class="empty-state" style="text-align: center; padding: 60px 20px;">
         <div class="spinner" style="border: 4px solid #2a3a5c; border-top: 4px solid #4a9eff; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
-        <h2 style="color: #4a9eff;">Cargando paquetes desde SFTP...</h2>
-        <p style="color: #6c757d;">Por favor espere mientras se cargan los paquetes guardados</p>
+        <h2 style="color: #4a9eff;">Inicializando...</h2>
       </div>
       <div *ngIf="!loadingPackages && !currentPackageId" class="empty-state">
-        <h2>No hay paquetes creados</h2>
-        <p>Haz clic en el botón "+" para crear tu primer paquete de sincronización</p>
+        <h2>Crear Archivos de Parámetros de Sincronización</h2>
+        <p>Haz clic en <strong>SUMMARY_SYNC</strong> o <strong>DETAILS_SYNC</strong> para cargar una plantilla y crear archivos de parámetros (.sqpr) con fechas específicas</p>
+        <p style="margin-top: 10px; color: #6c757d; font-size: 14px;">
+          <strong>Nota:</strong> Las plantillas se editan en el módulo "Editor de Plantillas". Este módulo solo crea instancias finales con fechas.
+        </p>
+        <p style="margin-top: 10px; color: #6c757d; font-size: 14px;">O haz clic en el botón "+" para crear un paquete personalizado</p>
       </div>
 
-      <div *ngIf="currentPackageId && getCurrentPackage()">
+        <div *ngIf="currentPackageId && getCurrentPackage()">
         <div *ngIf="getCurrentPackage()!.forms.length > 0" 
              style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: #0f1626; border-radius: 6px; border: 1px solid #2a3a5c;">
           <div>
@@ -32,10 +65,13 @@
             <p style="color: #6c757d; margin: 5px 0 0 0; font-size: 14px;">
               {{ getCurrentPackage()!.forms.length }} formulario{{ getCurrentPackage()!.forms.length > 1 ? 's' : '' }}
             </p>
+            <p style="color: #6c757d; margin: 5px 0 0 0; font-size: 12px;">
+              <small>💡 Al guardar, se creará una instancia final en: ~/lek-files-dev/can/sap-queries$</small>
+            </p>
           </div>
           <div style="display: flex; gap: 10px;">
-            <button class="btn" style="background: #17a2b8; color: white;" (click)="savePackageToSftp(currentPackageId!)" title="Guardar paquete en servidor SFTP">
-              💾 Guardar Paquete Completo
+            <button class="btn" style="background: #17a2b8; color: white;" (click)="savePackageToSftp(currentPackageId!)" title="Guardar archivos de parámetros (.sqpr) en servidor SFTP">
+              💾 Guardar Archivos de Parámetros (.sqpr)
             </button>
             <button class="btn" style="background: #6c757d; color: white;" (click)="undo()" title="Deshacer último cambio">
               ↶ Deshacer
@@ -89,7 +125,7 @@
               Haz clic para seleccionar un archivo JSON desde el servidor SFTP
             </div>
             <div *ngIf="getCurrentPackage()!.forms.length === 0" class="upload-hint">
-              Los archivos se cargan desde: ~/lek-files/can/sap-config/sap-gui-flow$
+              Los archivos se cargan desde: ~/lek-files-dev/can/sap-config/sap-gui-flow$
             </div>
           </div>
 
@@ -137,12 +173,35 @@
      class="modal" 
      [class.active]="showFileSelectorModal"
      (click)="closeFileSelectorModal()">
-  <div class="modal-content" (click)="$event.stopPropagation()" style="max-width: 800px;">
-    <div class="modal-header">Seleccionar Archivo JSON desde SFTP</div>
+  <div class="modal-content" (click)="$event.stopPropagation()" style="max-width: 900px;">
+    <div class="modal-header">
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <span>Seleccionar Flujo(s) desde SFTP</span>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <button class="btn btn-sm" 
+                  [class.btn-primary]="showMultiSelectMode"
+                  [class.btn-outline-secondary]="!showMultiSelectMode"
+                  (click)="toggleMultiSelectMode()"
+                  style="font-size: 12px; padding: 5px 10px;">
+            <i class="bi" [ngClass]="showMultiSelectMode ? 'bi-check-square' : 'bi-square'"></i>
+            {{ showMultiSelectMode ? 'Selección Múltiple' : 'Seleccionar Uno' }}
+          </button>
+        </div>
+      </div>
+    </div>
     <div class="input-group">
       <p style="color: #b0c4de; margin-bottom: 15px;">
-        <strong>Directorio:</strong> ~/lek-files/can/sap-config/sap-gui-flow$
+        <strong>Directorio:</strong> ~/lek-files-dev/can/sap-config/sap-gui-flow$
+        <br>
+        <small style="color: #6c757d;">
+          💡 <strong>Modo Selección Múltiple:</strong> Activa el modo para agregar varios flujos al mismo paquete con nombres personalizados.
+        </small>
       </p>
+      
+      <div *ngIf="showMultiSelectMode && selectedFiles.size > 0" 
+           style="padding: 10px; margin-bottom: 15px; background: #17a2b8; border-radius: 6px; color: white;">
+        <strong>{{ selectedFiles.size }}</strong> archivo(s) seleccionado(s)
+      </div>
       
       <div *ngIf="loadingFiles" class="loading-container" style="text-align: center; padding: 40px;">
         <div class="spinner" style="border: 4px solid #2a3a5c; border-top: 4px solid #4a9eff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
@@ -152,9 +211,16 @@
       <div *ngIf="!loadingFiles && availableJsonFiles.length > 0" class="file-list-container" style="max-height: 400px; overflow-y: auto;">
         <div *ngFor="let file of availableJsonFiles" 
              class="file-item" 
+             [class.selected]="isFileSelected(file.path)"
+             [class.multi-select-mode]="showMultiSelectMode"
              (click)="selectJsonFileFromSftp(file)"
-             style="padding: 15px; margin-bottom: 10px; background: #0f1626; border: 1px solid #2a3a5c; border-radius: 6px; cursor: pointer; transition: all 0.3s;">
+             style="padding: 15px; margin-bottom: 10px; background: #0f1626; border: 2px solid #2a3a5c; border-radius: 6px; cursor: pointer; transition: all 0.3s;"
+             [style.border-color]="isFileSelected(file.path) ? '#4a9eff' : '#2a3a5c'"
+             [style.background]="isFileSelected(file.path) ? '#1a2332' : '#0f1626'">
           <div style="display: flex; align-items: center; gap: 15px;">
+            <div *ngIf="showMultiSelectMode" style="font-size: 24px; color: #4a9eff;">
+              <i class="bi" [ngClass]="isFileSelected(file.path) ? 'bi-check-square-fill' : 'bi-square'"></i>
+            </div>
             <div style="font-size: 32px;">📄</div>
             <div style="flex: 1;">
               <div style="color: #4a9eff; font-weight: 600; margin-bottom: 5px;">{{ file.name }}</div>
@@ -166,7 +232,7 @@
                 {{ file.path }}
               </div>
             </div>
-            <div style="color: #4a9eff; font-size: 24px;">→</div>
+            <div *ngIf="!showMultiSelectMode" style="color: #4a9eff; font-size: 24px;">→</div>
           </div>
         </div>
       </div>
@@ -175,11 +241,270 @@
         <p>No se encontraron archivos JSON en el servidor SFTP.</p>
       </div>
     </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" (click)="closeFileSelectorModal()">Cancelar</button>
-      <button class="btn btn-secondary" (click)="loadJsonFilesFromSftp()" [disabled]="loadingFiles">
-        <span *ngIf="!loadingFiles">🔄</span> Actualizar Lista
+    <div class="modal-actions" style="display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <button class="btn btn-secondary" (click)="closeFileSelectorModal()">Cancelar</button>
+        <button class="btn btn-secondary" (click)="loadJsonFilesFromSftp()" [disabled]="loadingFiles" style="margin-left: 10px;">
+          <span *ngIf="!loadingFiles">🔄</span> Actualizar Lista
+        </button>
+      </div>
+      <div *ngIf="showMultiSelectMode">
+        <button class="btn btn-success" 
+                (click)="addMultipleFlowsToPackage()" 
+                [disabled]="selectedFiles.size === 0 || loadingFiles">
+          <i class="bi bi-plus-circle me-1"></i>
+          Agregar {{ selectedFiles.size }} Flujo(s)
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para selección de fechas -->
+<app-date-range-modal
+  [show]="showDateRangeModal"
+  [periodType]="dateModalPeriodType"
+  [title]="dateModalTitle"
+  (close)="closeDateRangeModal()"
+  (confirm)="onDateRangeConfirmed($event)">
+</app-date-range-modal>
+
+<!-- Modal para seleccionar plantilla personalizada -->
+<div *ngIf="showCustomTemplateModal" class="modal-overlay" (click)="closeCustomTemplateModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()" style="max-width: 700px;">
+    <div class="modal-header">
+      <h3>Cargar Plantilla Personalizada</h3>
+      <button class="close-btn" (click)="closeCustomTemplateModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom: 15px; color: #b0c4de;">
+        Selecciona una plantilla personalizada desde el Editor de Plantillas:
+        <br>
+        <small style="color: #6c757d;">Directorio: ~/lek-files-dev/can/sap-config/sap-query-package$</small>
+      </p>
+
+      <div *ngIf="loadingCustomTemplates" style="text-align: center; padding: 40px;">
+        <div class="spinner" style="border: 4px solid #2a3a5c; border-top: 4px solid #4a9eff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+        <p style="color: #b0c4de; margin-top: 15px;">Cargando plantillas...</p>
+      </div>
+
+      <div *ngIf="!loadingCustomTemplates && availableCustomTemplates.length > 0" style="max-height: 400px; overflow-y: auto; border: 1px solid #2a3a5c; border-radius: 6px; padding: 10px;">
+        <div *ngFor="let template of availableCustomTemplates" 
+             class="template-item" 
+             (click)="selectCustomTemplate(template)"
+             style="padding: 15px; margin-bottom: 10px; background: #0f1626; border: 2px solid #2a3a5c; border-radius: 6px; cursor: pointer; transition: all 0.3s;"
+             onmouseover="this.style.borderColor='#4a9eff'; this.style.background='#1a2332';"
+             onmouseout="this.style.borderColor='#2a3a5c'; this.style.background='#0f1626';">
+          <div style="display: flex; align-items: center; gap: 15px;">
+            <div style="font-size: 24px; color: #4a9eff;">
+              <i class="bi bi-file-earmark-text"></i>
+            </div>
+            <div style="flex: 1;">
+              <div style="color: #4a9eff; font-weight: 600; font-size: 16px;">{{ template.name.replace('.json', '') }}</div>
+              <div style="color: #6c757d; font-size: 11px; font-family: monospace; margin-top: 5px;">{{ template.path }}</div>
+            </div>
+            <div style="color: #6c757d; font-size: 20px;">
+              <i class="bi bi-chevron-right"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="!loadingCustomTemplates && availableCustomTemplates.length === 0" style="text-align: center; padding: 40px; color: #6c757d;">
+        <p>No se encontraron plantillas personalizadas.</p>
+        <p style="margin-top: 10px; font-size: 14px;">Crea una plantilla personalizada en el módulo "Editor de Plantillas".</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" style="background: #6c757d; color: white;" (click)="closeCustomTemplateModal()">
+        Cancelar
       </button>
+      <button class="btn" style="background: #17a2b8; color: white;" (click)="loadCustomTemplates()" [disabled]="loadingCustomTemplates">
+        <span *ngIf="!loadingCustomTemplates">🔄</span>
+        Actualizar Lista
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Panel de Estado de Ejecución -->
+<div class="execution-panel" [class.open]="showExecutionPanel" *ngIf="showExecutionPanel">
+  <div class="execution-panel-header">
+    <h5 class="mb-0">
+      <i class="bi bi-activity me-2"></i>
+      Estado de Ejecución
+      <span *ngIf="isExecuting" class="spinner-border spinner-border-sm ms-2" role="status"></span>
+    </h5>
+    <button class="btn btn-sm btn-outline-light" (click)="toggleExecutionPanel()">
+      <i class="bi bi-x"></i>
+    </button>
+  </div>
+  
+  <div class="execution-panel-body">
+    <!-- Resumen de ejecución -->
+    <div class="execution-summary mb-3" *ngIf="executionStartTime">
+      <div class="row g-2">
+        <div class="col-6">
+          <div class="summary-card">
+            <div class="summary-value">{{ executionSteps.length }}</div>
+            <div class="summary-label">Formularios</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="summary-card">
+            <div class="summary-value">{{ getCompletedStepsCount() }}</div>
+            <div class="summary-label">Completados</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="summary-card">
+            <div class="summary-value">{{ getErrorStepsCount() }}</div>
+            <div class="summary-label">Errores</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="summary-card">
+            <div class="summary-value">{{ formatDuration(getExecutionDuration()) }}</div>
+            <div class="summary-label">Duración</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Resultado de validación -->
+    <div class="validation-section mb-3" *ngIf="validationResult">
+      <h6 [ngClass]="{
+        'text-danger': !validationResult.isValid,
+        'text-warning': validationResult.isValid && validationResult.warnings.length > 0,
+        'text-success': validationResult.isValid && validationResult.warnings.length === 0
+      }">
+        <i class="bi me-2" [ngClass]="{
+          'bi-x-circle': !validationResult.isValid,
+          'bi-exclamation-triangle': validationResult.isValid && validationResult.warnings.length > 0,
+          'bi-check-circle': validationResult.isValid && validationResult.warnings.length === 0
+        }"></i>
+        Validación del Paquete
+        <span class="badge ms-2" [ngClass]="{
+          'bg-danger': !validationResult.isValid,
+          'bg-warning': validationResult.isValid && validationResult.warnings.length > 0,
+          'bg-success': validationResult.isValid && validationResult.warnings.length === 0
+        }">
+          {{ validationResult.isValid ? 'Válido' : 'Inválido' }}
+        </span>
+      </h6>
+      
+      <!-- Errores -->
+      <div *ngIf="validationResult.errors.length > 0" class="alert alert-danger">
+        <strong>Errores ({{ validationResult.errors.length }}):</strong>
+        <ul class="mb-0 mt-2">
+          <li *ngFor="let error of validationResult.errors">
+            <span *ngIf="error.formId" class="badge bg-secondary me-1">{{ error.formId }}</span>
+            <span *ngIf="error.tcode" class="badge bg-info me-1">{{ error.tcode }}</span>
+            {{ error.message }}
+          </li>
+        </ul>
+      </div>
+      
+      <!-- Advertencias -->
+      <div *ngIf="validationResult.warnings.length > 0" class="alert alert-warning">
+        <strong>Advertencias ({{ validationResult.warnings.length }}):</strong>
+        <ul class="mb-0 mt-2">
+          <li *ngFor="let warning of validationResult.warnings.slice(0, 10)">
+            <span *ngIf="warning.formId" class="badge bg-secondary me-1">{{ warning.formId }}</span>
+            <span *ngIf="warning.tcode" class="badge bg-info me-1">{{ warning.tcode }}</span>
+            {{ warning.message }}
+          </li>
+          <li *ngIf="validationResult.warnings.length > 10" class="text-muted">
+            ... y {{ validationResult.warnings.length - 10 }} advertencia(s) más
+          </li>
+        </ul>
+      </div>
+    </div>
+    
+    <!-- Pasos de ejecución -->
+    <div class="execution-steps-section mb-3" *ngIf="executionSteps.length > 0">
+      <h6 class="text-info">
+        <i class="bi bi-list-ol me-2"></i>
+        Pasos de Ejecución
+      </h6>
+      <div class="execution-steps-container">
+        <div *ngFor="let step of executionSteps" 
+             class="execution-step-item"
+             [ngClass]="{
+               'step-pending': step.status === 'pending',
+               'step-executing': step.status === 'executing',
+               'step-completed': step.status === 'completed',
+               'step-error': step.status === 'error'
+             }">
+          <div class="step-header">
+            <div class="step-status-icon">
+              <i *ngIf="step.status === 'pending'" class="bi bi-circle"></i>
+              <span *ngIf="step.status === 'executing'" class="spinner-border spinner-border-sm"></span>
+              <i *ngIf="step.status === 'completed'" class="bi bi-check-circle text-success"></i>
+              <i *ngIf="step.status === 'error'" class="bi bi-x-circle text-danger"></i>
+            </div>
+            <div class="step-info">
+              <div class="step-name">{{ step.formName }}</div>
+              <div class="step-file">{{ step.fileName }}</div>
+            </div>
+            <div class="step-duration" *ngIf="step.duration">
+              {{ formatDuration(step.duration) }}
+            </div>
+          </div>
+          <div *ngIf="step.error" class="step-error-message">
+            <strong>Error:</strong> {{ step.error }}
+          </div>
+          <div *ngIf="step.validationResult" class="step-validation">
+            <div *ngIf="step.validationResult.errors.length > 0" class="text-danger small">
+              <strong>Errores:</strong> {{ step.validationResult.errors.join(', ') }}
+            </div>
+            <div *ngIf="step.validationResult.warnings.length > 0" class="text-warning small">
+              <strong>Advertencias:</strong> {{ step.validationResult.warnings.join(', ') }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Logs de ejecución -->
+    <div class="execution-logs-section">
+      <h6 class="text-secondary">
+        <i class="bi bi-list-ul me-2"></i>
+        Logs de Ejecución
+        <button class="btn btn-sm btn-outline-light ms-2" (click)="clearExecutionLogs()">
+          <i class="bi bi-trash"></i> Limpiar
+        </button>
+        <button class="btn btn-sm btn-outline-light ms-1" (click)="exportExecutionLogs()">
+          <i class="bi bi-download"></i> Exportar
+        </button>
+      </h6>
+      <div class="execution-logs-container">
+        <div *ngFor="let log of executionLogs.slice().reverse().slice(0, 100)" 
+             class="execution-log-item"
+             [ngClass]="{
+               'log-error': log.type === 'error',
+               'log-warning': log.type === 'warning',
+               'log-info': log.type === 'info',
+               'log-success': log.type === 'success'
+             }">
+          <div class="log-header">
+            <span class="log-time">{{ log.timestamp | date:'HH:mm:ss' }}</span>
+            <span class="badge ms-2" [ngClass]="{
+              'bg-danger': log.type === 'error',
+              'bg-warning text-dark': log.type === 'warning',
+              'bg-info': log.type === 'info',
+              'bg-success': log.type === 'success'
+            }">{{ log.type.toUpperCase() }}</span>
+          </div>
+          <div class="log-message">{{ log.message }}</div>
+          <div *ngIf="log.data" class="log-data">
+            <pre>{{ getLogDataString(log.data) }}</pre>
+          </div>
+        </div>
+        <div *ngIf="executionLogs.length === 0" class="text-muted text-center py-3">
+          No hay logs disponibles
+        </div>
+      </div>
     </div>
   </div>
 </div>

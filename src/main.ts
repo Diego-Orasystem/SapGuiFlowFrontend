@@ -11,11 +11,17 @@ import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { AppComponent } from './app/app.component';
 import { HomeComponent } from './app/components/home/home.component';
 import { SyncPackagesComponent } from './app/components/sync-packages/sync-packages.component';
+import { SyncTemplatesEditorComponent } from './app/components/sync-templates-editor/sync-templates-editor.component';
+import { SftpExplorerComponent } from './app/components/sftp-explorer/sftp-explorer.component';
+import { SchedulerComponent } from './app/components/scheduler/scheduler.component';
 
 const routes: Routes = [
   { path: '', redirectTo: '/home', pathMatch: 'full' },
   { path: 'home', component: HomeComponent },
   { path: 'sync-packages', component: SyncPackagesComponent },
+  { path: 'sync-templates-editor', component: SyncTemplatesEditorComponent },
+  { path: 'sftp-explorer', component: SftpExplorerComponent },
+  { path: 'scheduler', component: SchedulerComponent },
   { path: '**', redirectTo: '/home' }
 ];
 

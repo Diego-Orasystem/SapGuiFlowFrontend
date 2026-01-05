@@ -1,0 +1,451 @@
+<div class="container-fluid py-3">
+  <h1 class="mb-4">
+    <i class="bi bi-folder2-open me-2"></i>
+    Explorador SFTP
+  </h1>
+
+  <!-- Barra de navegación -->
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2 flex-grow-1">
+          <button class="btn btn-outline-secondary" (click)="navigateBack()" [disabled]="pathHistory.length <= 1" title="Atrás">
+            <i class="bi bi-arrow-left"></i>
+          </button>
+          
+          <!-- Barra de dirección editable (como Windows Explorer) -->
+          <div class="path-bar-container flex-grow-1">
+            <div *ngIf="!isEditingPath" class="path-display" (click)="startEditingPath()" title="Haz clic para editar la ruta">
+              <i class="bi bi-folder me-2"></i>
+              <span class="path-text">{{ currentPath || 'Root' }}</span>
+              <i class="bi bi-pencil ms-2 text-muted small"></i>
+            </div>
+            <div *ngIf="isEditingPath" class="path-input-container">
+              <input 
+                type="text" 
+                class="form-control path-input" 
+                [(ngModel)]="editablePath"
+                (keydown)="onPathKeyDown($event)"
+                (blur)="cancelEditingPath()"
+                #pathInput
+                placeholder="Ingresa la ruta y presiona Enter">
+              <button class="btn btn-sm btn-primary" (click)="navigateFromEditablePath()" title="Navegar (Enter)">
+                <i class="bi bi-arrow-right"></i>
+              </button>
+              <button class="btn btn-sm btn-secondary" (click)="cancelEditingPath()" title="Cancelar (Esc)">
+                <i class="bi bi-x"></i>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Breadcrumb (alternativo, se puede ocultar si se prefiere solo la barra de dirección) -->
+          <nav aria-label="breadcrumb" class="breadcrumb-nav" *ngIf="!isEditingPath">
+            <ol class="breadcrumb mb-0">
+              <li class="breadcrumb-item">
+                <a href="#" (click)="navigateToPath(''); $event.preventDefault()">Root</a>
+              </li>
+              <li *ngFor="let segment of pathSegments; let i = index" class="breadcrumb-item">
+                <a href="#" (click)="navigateToPath(getPathToSegment(segment, i)); $event.preventDefault()">
+                  {{ segment }}
+                </a>
+              </li>
+            </ol>
+          </nav>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-success" (click)="openCreateModal('file')">
+            <i class="bi bi-file-earmark-plus me-1"></i>
+            Nuevo Archivo
+          </button>
+          <button class="btn btn-primary" (click)="openCreateModal('directory')">
+            <i class="bi bi-folder-plus me-1"></i>
+            Nueva Carpeta
+          </button>
+          <button class="btn btn-outline-info" (click)="toggleInfoPanel()" [class.active]="showInfoPanel" [title]="showInfoPanel ? 'Ocultar panel de información' : 'Mostrar panel de información'">
+            <i class="bi bi-info-circle"></i>
+          </button>
+          <button class="btn btn-outline-secondary" (click)="toggleLogsPanel()" [class.active]="showLogsPanel" [title]="showLogsPanel ? 'Ocultar panel de logs' : 'Mostrar panel de logs'">
+            <i class="bi bi-list-ul"></i>
+            <span *ngIf="getOperationErrorsCount() > 0" class="badge bg-danger ms-1">{{ getOperationErrorsCount() }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mensaje de error -->
+  <div *ngIf="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
+    {{ errorMessage }}
+    <button type="button" class="btn-close" (click)="errorMessage = null"></button>
+  </div>
+
+  <!-- Lista de archivos -->
+  <div class="card">
+    <div class="card-body">
+      <div *ngIf="loading" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Cargando...</span>
+        </div>
+      </div>
+
+      <div *ngIf="!loading && files.length === 0" class="text-center py-5 text-muted">
+        <i class="bi bi-folder-x display-4 d-block mb-3"></i>
+        <p>El directorio está vacío</p>
+      </div>
+
+      <div *ngIf="!loading && files.length > 0" class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Tipo</th>
+              <th>Tamaño</th>
+              <th>Fecha de Modificación</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let file of files" [class.table-active]="file.isDirectory" 
+                (dblclick)="file.isDirectory ? navigateToDirectory(file) : openEditModal(file)"
+                style="cursor: pointer;">
+              <td>
+                <i class="bi me-2" [ngClass]="getFileIcon(file)"></i>
+                {{ file.name }}
+              </td>
+              <td>
+                <span class="badge" [ngClass]="file.isDirectory ? 'bg-primary' : 'bg-secondary'">
+                  {{ file.isDirectory ? 'Directorio' : 'Archivo' }}
+                </span>
+              </td>
+              <td>{{ file.isDirectory ? '-' : formatFileSize(file.size) }}</td>
+              <td>{{ formatDate(file.modifiedDate) }}</td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <button *ngIf="file.isDirectory" 
+                          class="btn btn-outline-primary" 
+                          (click)="navigateToDirectory(file); $event.stopPropagation()"
+                          title="Abrir">
+                    <i class="bi bi-folder2-open"></i>
+                  </button>
+                  <button *ngIf="!file.isDirectory" 
+                          class="btn btn-outline-success" 
+                          (click)="downloadFile(file); $event.stopPropagation()"
+                          title="Descargar">
+                    <i class="bi bi-download"></i>
+                  </button>
+                  <button *ngIf="!file.isDirectory" 
+                          class="btn btn-outline-info" 
+                          (click)="openEditModal(file); $event.stopPropagation()"
+                          title="Editar">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="btn btn-outline-danger" 
+                          (click)="openDeleteModal(file); $event.stopPropagation()"
+                          title="Eliminar">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para crear archivo/carpeta -->
+<div class="modal fade" [class.show]="showCreateModal" [style.display]="showCreateModal ? 'block' : 'none'" 
+     tabindex="-1" *ngIf="showCreateModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi me-2" [ngClass]="newItemType === 'file' ? 'bi-file-earmark-plus' : 'bi-folder-plus'"></i>
+          Crear {{ newItemType === 'file' ? 'Archivo' : 'Carpeta' }}
+        </h5>
+        <button type="button" class="btn-close" (click)="showCreateModal = false"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Nombre</label>
+          <input type="text" class="form-control" [(ngModel)]="newItemName" 
+                 [placeholder]="'Nombre del ' + (newItemType === 'file' ? 'archivo' : 'carpeta')">
+        </div>
+        <div *ngIf="newItemType === 'file'" class="mb-3">
+          <label class="form-label">Contenido</label>
+          <textarea class="form-control" rows="10" [(ngModel)]="newItemContent" 
+                    placeholder="Contenido del archivo"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="showCreateModal = false">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="createItem()">Crear</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div *ngIf="showCreateModal" class="modal-backdrop fade show"></div>
+
+<!-- Modal para editar archivo -->
+<div class="modal fade" [class.show]="showEditModal" [style.display]="showEditModal ? 'block' : 'none'" 
+     tabindex="-1" *ngIf="showEditModal && editingFile">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-pencil me-2"></i>
+          Editar: {{ editingFile.name }}
+        </h5>
+        <button type="button" class="btn-close" (click)="showEditModal = false"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Contenido</label>
+          <textarea class="form-control" rows="20" [(ngModel)]="editContent" 
+                    style="font-family: monospace;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="showEditModal = false">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="saveFile()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div *ngIf="showEditModal" class="modal-backdrop fade show"></div>
+
+<!-- Modal para confirmar eliminación -->
+<div class="modal fade" [class.show]="showDeleteModal" [style.display]="showDeleteModal ? 'block' : 'none'" 
+     tabindex="-1" *ngIf="showDeleteModal && deletingItem">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-exclamation-triangle text-warning me-2"></i>
+          Confirmar Eliminación
+        </h5>
+        <button type="button" class="btn-close" (click)="showDeleteModal = false"></button>
+      </div>
+      <div class="modal-body">
+        <p>¿Está seguro de que desea eliminar <strong>{{ deletingItem.name }}</strong>?</p>
+        <p class="text-muted small">Esta acción no se puede deshacer.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="showDeleteModal = false">Cancelar</button>
+        <button type="button" class="btn btn-danger" (click)="deleteItem()">Eliminar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div *ngIf="showDeleteModal" class="modal-backdrop fade show"></div>
+
+<!-- Panel de Información del Archivo -->
+<div class="info-panel" [class.open]="showInfoPanel" *ngIf="showInfoPanel">
+  <div class="info-panel-header">
+    <h5 class="mb-0">
+      <i class="bi bi-info-circle me-2"></i>
+      Información del Archivo
+    </h5>
+    <button class="btn btn-sm btn-outline-light" (click)="toggleInfoPanel()">
+      <i class="bi bi-x"></i>
+    </button>
+  </div>
+  
+  <div class="info-panel-body" *ngIf="fileDetails">
+    <!-- Detalles del archivo -->
+    <div class="info-section mb-3">
+      <h6 class="text-primary">
+        <i class="bi bi-file-earmark me-2"></i>
+        Detalles
+      </h6>
+      <table class="table table-sm table-dark">
+        <tbody>
+          <tr>
+            <td><strong>Nombre:</strong></td>
+            <td>{{ fileDetails.name }}</td>
+          </tr>
+          <tr>
+            <td><strong>Tipo:</strong></td>
+            <td>{{ fileDetails.type }}</td>
+          </tr>
+          <tr>
+            <td><strong>Tamaño:</strong></td>
+            <td>{{ fileDetails.size }}</td>
+          </tr>
+          <tr>
+            <td><strong>Modificado:</strong></td>
+            <td>{{ fileDetails.modified }}</td>
+          </tr>
+          <tr *ngIf="fileDetails.extension">
+            <td><strong>Extensión:</strong></td>
+            <td>{{ fileDetails.extension }}</td>
+          </tr>
+          <tr *ngIf="fileDetails.estimatedLines">
+            <td><strong>Líneas estimadas:</strong></td>
+            <td>{{ fileDetails.estimatedLines }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- Vista previa (solo para archivos JSON) -->
+    <div class="preview-section mb-3" *ngIf="showPreview && fileDetails.isJson">
+      <h6 class="text-info">
+        <i class="bi bi-eye me-2"></i>
+        Vista Previa
+      </h6>
+      <div class="preview-container">
+        <pre class="preview-content">{{ filePreview || 'Cargando...' }}</pre>
+      </div>
+    </div>
+    
+    <!-- Validación JSON -->
+    <div class="validation-section mb-3" *ngIf="fileDetails.isJson && validationResult">
+      <h6 [ngClass]="{
+        'text-danger': !validationResult.isValid,
+        'text-warning': validationResult.isValid && validationResult.warnings.length > 0,
+        'text-success': validationResult.isValid && validationResult.warnings.length === 0
+      }">
+        <i class="bi me-2" [ngClass]="{
+          'bi-x-circle': !validationResult.isValid,
+          'bi-exclamation-triangle': validationResult.isValid && validationResult.warnings.length > 0,
+          'bi-check-circle': validationResult.isValid && validationResult.warnings.length === 0
+        }"></i>
+        Validación JSON
+        <span class="badge ms-2" [ngClass]="{
+          'bg-danger': !validationResult.isValid,
+          'bg-warning': validationResult.isValid && validationResult.warnings.length > 0,
+          'bg-success': validationResult.isValid && validationResult.warnings.length === 0
+        }">
+          {{ validationResult.isValid ? 'Válido' : 'Inválido' }}
+        </span>
+      </h6>
+      
+      <!-- Errores -->
+      <div *ngIf="validationResult.errors.length > 0" class="alert alert-danger">
+        <strong>Errores:</strong>
+        <ul class="mb-0 mt-2">
+          <li *ngFor="let error of validationResult.errors">{{ error }}</li>
+        </ul>
+      </div>
+      
+      <!-- Advertencias -->
+      <div *ngIf="validationResult.warnings.length > 0" class="alert alert-warning">
+        <strong>Advertencias:</strong>
+        <ul class="mb-0 mt-2">
+          <li *ngFor="let warning of validationResult.warnings">{{ warning }}</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  
+  <div class="info-panel-body" *ngIf="!fileDetails">
+    <div class="text-muted text-center py-3">
+      Seleccione un archivo para ver su información
+    </div>
+  </div>
+</div>
+
+<!-- Panel de Logs de Operaciones -->
+<div class="logs-panel" [class.open]="showLogsPanel" *ngIf="showLogsPanel">
+  <div class="logs-panel-header">
+    <h5 class="mb-0">
+      <i class="bi bi-list-ul me-2"></i>
+      Logs de Operaciones SFTP
+    </h5>
+    <button class="btn btn-sm btn-outline-light" (click)="toggleLogsPanel()">
+      <i class="bi bi-x"></i>
+    </button>
+  </div>
+  
+  <div class="logs-panel-body">
+    <!-- Resumen de operaciones -->
+    <div class="logs-summary mb-3">
+      <div class="row g-2">
+        <div class="col-6">
+          <div class="summary-card">
+            <div class="summary-value">{{ operationLogs.length }}</div>
+            <div class="summary-label">Total</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="summary-card">
+            <div class="summary-value">{{ getOperationSuccessCount() }}</div>
+            <div class="summary-label">Exitosas</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="summary-card">
+            <div class="summary-value">{{ getOperationErrorsCount() }}</div>
+            <div class="summary-label">Errores</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="summary-card">
+            <div class="summary-value">{{ getOperationWarningsCount() }}</div>
+            <div class="summary-label">Advertencias</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Logs -->
+    <div class="logs-section">
+      <h6 class="text-secondary">
+        <i class="bi bi-clock-history me-2"></i>
+        Historial de Operaciones
+        <button class="btn btn-sm btn-outline-light ms-2" (click)="clearOperationLogs()">
+          <i class="bi bi-trash"></i> Limpiar
+        </button>
+        <button class="btn btn-sm btn-outline-light ms-1" (click)="exportOperationLogs()">
+          <i class="bi bi-download"></i> Exportar
+        </button>
+      </h6>
+      <div class="logs-container">
+        <div *ngFor="let log of operationLogs.slice().reverse().slice(0, 100)" 
+             class="log-item"
+             [ngClass]="{
+               'log-error': log.status === 'error',
+               'log-warning': log.status === 'warning',
+               'log-success': log.status === 'success'
+             }">
+          <div class="log-header">
+            <span class="log-time">{{ log.timestamp | date:'HH:mm:ss' }}</span>
+            <span class="badge ms-2" [ngClass]="{
+              'bg-danger': log.status === 'error',
+              'bg-warning text-dark': log.status === 'warning',
+              'bg-success': log.status === 'success'
+            }">{{ log.status.toUpperCase() }}</span>
+            <span class="badge bg-secondary ms-1">{{ log.type.toUpperCase() }}</span>
+          </div>
+          <div class="log-message">{{ log.message }}</div>
+          <div class="log-details">
+            <div *ngIf="log.path" class="log-detail">
+              <strong>Path:</strong> {{ log.path }}
+            </div>
+            <div *ngIf="log.fileName" class="log-detail">
+              <strong>Archivo:</strong> {{ log.fileName }}
+            </div>
+            <div *ngIf="log.duration" class="log-detail">
+              <strong>Duración:</strong> {{ formatDuration(log.duration) }}
+            </div>
+            <div *ngIf="log.fileSize" class="log-detail">
+              <strong>Tamaño:</strong> {{ formatFileSize(log.fileSize) }}
+            </div>
+            <div *ngIf="log.error" class="log-detail text-danger">
+              <strong>Error:</strong> {{ log.error }}
+            </div>
+            <div *ngIf="log.errorCode" class="log-detail text-danger">
+              <strong>Código de error:</strong> {{ log.errorCode }}
+            </div>
+          </div>
+        </div>
+        <div *ngIf="operationLogs.length === 0" class="text-muted text-center py-3">
+          No hay logs disponibles
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+

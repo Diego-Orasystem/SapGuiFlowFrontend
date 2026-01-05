@@ -1,8 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FlowEditorComponent } from '../flow-editor/flow-editor.component';
-import { FilePreviewComponent } from '../file-preview/file-preview.component';
-import { ExportToolsComponent } from '../export-tools/export-tools.component';
 import { FileService } from '../../services/file.service';
 import { FlowService } from '../../services/flow.service';
 import { SftpService, SftpFile } from '../../services/sftp.service';
@@ -14,9 +12,7 @@ import { SftpService, SftpFile } from '../../services/sftp.service';
   standalone: true,
   imports: [
     CommonModule,
-    FlowEditorComponent, 
-    FilePreviewComponent, 
-    ExportToolsComponent
+    FlowEditorComponent
   ]
 })
 export class HomeComponent implements OnInit {
@@ -33,7 +29,14 @@ export class HomeComponent implements OnInit {
   ) {}
   
   ngOnInit(): void {
+    // Cargar lista de flujos desde SFTP
     this.loadFlowsFromSftp();
+    
+    // Crear automáticamente un flujo en blanco al iniciar
+    // Esto asegura que los targets se carguen desde el inicio
+    setTimeout(() => {
+      this.createBlankFlow();
+    }, 500); // Pequeño delay para asegurar que el componente esté completamente inicializado
   }
   
   toggleFileSelectorSection(): void {
@@ -147,16 +150,13 @@ export class HomeComponent implements OnInit {
       "steps": {}
     };
 
-    const flowName = `Nuevo_Flujo_${new Date().toISOString().replace(/[:.]/g, '-').split('T')[0]}`;
+    const flowName = `Nuevo_Flujo_${new Date().toISOString().replace(/[:.]/g, '-').split('T')[0]}_${Date.now()}`;
     const flowFileName = `${flowName}.json`;
     
     // Convertir a JSON formateado
     this.sapFlowJson = JSON.stringify(blankFlow, null, 2);
     
-    // Cargar el flujo en el editor
-    this.flowService.importSapFlow(this.sapFlowJson, flowFileName);
-    
-    // Notificar al FileService
+    // Primero notificar al FileService para que el editor lo detecte
     this.fileService.setSelectedFile({
       name: flowFileName,
       path: '',
@@ -164,6 +164,9 @@ export class HomeComponent implements OnInit {
       size: this.sapFlowJson.length,
       modified: new Date()
     });
+    
+    // Luego cargar el flujo en el editor
+    this.flowService.importSapFlow(this.sapFlowJson, flowFileName);
 
     // Limpiar selección de flujo SFTP
     this.selectedFlow = null;

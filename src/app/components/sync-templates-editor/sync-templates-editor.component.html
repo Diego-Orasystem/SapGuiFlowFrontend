@@ -1,0 +1,380 @@
+<div class="container">
+  <h1>Editor de Plantillas de Sincronización</h1>
+
+  <div id="templatesContainer">
+    <!-- Información sobre el editor -->
+    <div style="margin-bottom: 20px; padding: 12px; background: #1a2332; border-radius: 6px; border-left: 4px solid #17a2b8;">
+      <p style="color: #b0c4de; margin: 0; font-size: 13px;">
+        <strong>📝 Editor de Plantillas:</strong><br>
+        • Edita los valores por defecto de las plantillas SUMMARY_SYNC, DETAILS_SYNC y plantillas personalizadas<br>
+        • Flujos base: ~/lek-files-dev/can/sap-config/sap-gui-flow$ (se leen desde aquí)<br>
+        • Plantillas guardadas: ~/lek-files-dev/can/sap-config/sap-query-package$ (se guardan aquí)<br>
+        • Puedes crear plantillas personalizadas seleccionando flujos desde SFTP
+      </p>
+    </div>
+
+    <!-- Botones de acción -->
+    <div style="display: flex; gap: 10px; margin-bottom: 20px; padding: 15px; background: #0f1626; border-radius: 6px; border: 1px solid #2a3a5c;">
+      <button class="btn" style="background: #dc3545; color: white;" (click)="initializeTemplates()" title="Eliminar todas las plantillas existentes">
+        <i class="bi bi-trash me-1"></i>
+        Eliminar Plantillas Existentes
+      </button>
+      <button class="btn" style="background: #28a745; color: white;" (click)="openCreateTemplateModal()" title="Crear nueva plantilla desde flujos base">
+        <i class="bi bi-plus-circle me-1"></i>
+        Crear Nueva Plantilla
+      </button>
+      <button class="btn" style="background: #6c757d; color: white;" (click)="toggleValidationPanel()" [class.active]="showValidationPanel" [title]="showValidationPanel ? 'Ocultar panel de validación' : 'Mostrar panel de validación'">
+        <i class="bi" [ngClass]="showValidationPanel ? 'bi-shield-check' : 'bi-shield'"></i>
+        <span *ngIf="validationResult && !validationResult.isValid" class="badge bg-danger ms-1">{{ validationResult.errors.length }}</span>
+      </button>
+    </div>
+
+    <div class="templates-tabs">
+      <div *ngFor="let template of templates" 
+           class="template-tab" 
+           [class.active]="currentTemplateId === template.id">
+        <span (click)="selectTemplate(template.id)">{{ template.name }}</span>
+        <button class="edit-name" (click)="renameTemplate(template.id); $event.stopPropagation()" title="Renombrar plantilla">✎</button>
+        <button class="close-btn" (click)="deleteTemplate(template.id); $event.stopPropagation()" title="Eliminar plantilla">×</button>
+      </div>
+    </div>
+
+    <div class="template-content">
+      <div *ngIf="loadingTemplates" class="empty-state" style="text-align: center; padding: 60px 20px;">
+        <div class="spinner" style="border: 4px solid #2a3a5c; border-top: 4px solid #4a9eff; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+        <h2 style="color: #4a9eff;">Cargando plantillas...</h2>
+      </div>
+      
+      <div *ngIf="!loadingTemplates && !currentTemplateId" class="empty-state">
+        <h2>Crear o Cargar Plantilla</h2>
+        <p>Haz clic en <strong>Crear Nueva Plantilla</strong> para crear una plantilla desde los flujos base</p>
+        <p style="margin-top: 10px; color: #6c757d; font-size: 14px;">O espera a que se carguen las plantillas guardadas previamente</p>
+      </div>
+
+      <div *ngIf="currentTemplateId && getCurrentTemplate()">
+        <div *ngIf="getCurrentTemplate()!.forms.length > 0" 
+             style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: #0f1626; border-radius: 6px; border: 1px solid #2a3a5c;">
+          <div>
+            <h3 style="color: #4a9eff; margin: 0;">{{ getCurrentTemplate()!.name }}</h3>
+            <p style="color: #6c757d; margin: 5px 0 0 0; font-size: 14px;">
+              Tipo: {{ getCurrentTemplate()!.type }} | 
+              {{ getCurrentTemplate()!.forms.length }} formulario{{ getCurrentTemplate()!.forms.length > 1 ? 's' : '' }}
+            </p>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn" style="background: #28a745; color: white;" (click)="saveTemplate(currentTemplateId!)" title="Guardar plantilla editada">
+              💾 Guardar Plantilla
+            </button>
+          </div>
+        </div>
+
+        <div *ngIf="getCurrentTemplate()!.forms.length > 0" class="forms-tabs">
+          <button *ngIf="getCurrentTemplate()!.type === 'CUSTOM'" 
+                  class="btn-add-form" 
+                  (click)="addFlowToTemplate()" 
+                  title="Agregar flujo a la plantilla">+</button>
+          <div *ngFor="let form of getCurrentTemplate()!.forms" 
+               class="form-tab" 
+               [class.active]="currentFormId === form.id">
+            <span (click)="selectForm(form.id)">{{ form.customName }}</span>
+            <button class="edit-name" (click)="renameForm(form.id); $event.stopPropagation()" title="Renombrar formulario">✎</button>
+          </div>
+        </div>
+
+        <div *ngIf="getCurrentTemplate()!.forms.length > 0 && getCurrentForm()">
+          <div class="form-editor">
+            <h4 style="color: #4a9eff; margin-bottom: 20px;">
+              Valores por Defecto - {{ getCurrentForm()!.customName }}
+            </h4>
+            
+            <div class="form-fields">
+              <div *ngFor="let param of getCurrentForm()!.parameters" class="form-field">
+                <label [for]="'param_' + getCurrentForm()!.id + '_' + normalizeParamForId(param)">
+                  {{ param }}
+                </label>
+                
+                <!-- Checkbox para Columns y NoSum -->
+                <div *ngIf="param === 'Columns' || param === 'NoSum'" class="checkbox-group">
+                  <input 
+                    type="checkbox" 
+                    [id]="'param_' + getCurrentForm()!.id + '_' + normalizeParamForId(param)"
+                    [checked]="getParamValue(param) && getParamValue(param).length > 0 && getParamValue(param)[0] === 'All'"
+                    (change)="updateParamValue(param, $any($event.target).checked ? ['All'] : [])"
+                    class="form-check-input">
+                  <label [for]="'param_' + getCurrentForm()!.id + '_' + normalizeParamForId(param)" class="form-check-label">
+                    Todos
+                  </label>
+                </div>
+                
+                <!-- Input de texto para otros parámetros -->
+                <input 
+                  *ngIf="param !== 'Columns' && param !== 'NoSum'"
+                  type="text" 
+                  [id]="'param_' + getCurrentForm()!.id + '_' + normalizeParamForId(param)"
+                  [value]="getParamValue(param)"
+                  (input)="updateParamValue(param, $any($event.target).value)"
+                  class="form-control"
+                  [placeholder]="'Ingrese valor para ' + param">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para crear nueva plantilla -->
+<div *ngIf="showCreateTemplateModal" class="modal-overlay" (click)="showCreateTemplateModal = false; showFlowSelector = false; selectedTemplateType = null; customTemplateName = ''; selectedFlowsForTemplate.clear();">
+  <div class="modal-content" [class.flow-selector]="showFlowSelector" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Crear Nueva Plantilla</h3>
+      <button class="close-btn" (click)="showCreateTemplateModal = false">×</button>
+    </div>
+    <div class="modal-body">
+      <div *ngIf="!showFlowSelector">
+        <p style="margin-bottom: 15px; color: #b0c4de;">Selecciona el tipo de plantilla a crear:</p>
+        
+        <div class="template-type-selector">
+          <div class="template-type-option" 
+               [class.selected]="selectedTemplateType === 'SUMMARY_SYNC'"
+               (click)="selectedTemplateType = 'SUMMARY_SYNC'">
+            <h4>SUMMARY_SYNC</h4>
+            <p>Plantilla con un solo formulario (ZFIR_STATSLOAD)</p>
+          </div>
+          
+          <div class="template-type-option" 
+               [class.selected]="selectedTemplateType === 'DETAILS_SYNC'"
+               (click)="selectedTemplateType = 'DETAILS_SYNC'">
+            <h4>DETAILS_SYNC</h4>
+            <p>Plantilla con múltiples formularios (KSB1, KOB1, CJI3_ALLCOST, CJI3_CANDALL)</p>
+          </div>
+          
+          <div class="template-type-option" 
+               [class.selected]="selectedTemplateType === 'CUSTOM'"
+               (click)="selectedTemplateType = 'CUSTOM'">
+            <h4>Personalizada</h4>
+            <p>Selecciona flujos desde SFTP y crea tu propia plantilla</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Selector de flujos para plantilla personalizada -->
+      <div *ngIf="showFlowSelector && selectedTemplateType === 'CUSTOM'">
+        <div style="margin-bottom: 15px;">
+          <label style="display: block; color: #b0c4de; margin-bottom: 8px;">
+            <strong>Nombre de la Plantilla:</strong>
+          </label>
+          <input type="text" 
+                 class="form-control" 
+                 [(ngModel)]="customTemplateName"
+                 placeholder="Ej: Mi Plantilla Personalizada"
+                 style="width: 100%; padding: 10px; background: #0f1626; border: 1px solid #2a3a5c; border-radius: 6px; color: #e0e0e0;">
+        </div>
+
+        <p style="margin-bottom: 15px; color: #b0c4de;">
+          <strong>Selecciona los flujos desde SFTP:</strong>
+          <br>
+          <small style="color: #6c757d;">
+            Directorio: ~/lek-files-dev/can/sap-config/sap-gui-flow$
+          </small>
+        </p>
+
+        <div *ngIf="loadingFlows" style="text-align: center; padding: 40px;">
+          <div class="spinner" style="border: 4px solid #2a3a5c; border-top: 4px solid #4a9eff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+          <p style="color: #b0c4de; margin-top: 15px;">Cargando flujos desde SFTP...</p>
+        </div>
+
+        <div *ngIf="!loadingFlows && availableFlows.length > 0" style="max-height: 300px; overflow-y: auto; border: 1px solid #2a3a5c; border-radius: 6px; padding: 10px;">
+          <div *ngFor="let flow of availableFlows" 
+               class="flow-item" 
+               [class.selected]="isFlowSelected(flow.path)"
+               (click)="toggleFlowSelection(flow.path)"
+               style="padding: 12px; margin-bottom: 8px; background: #0f1626; border: 2px solid #2a3a5c; border-radius: 6px; cursor: pointer; transition: all 0.3s;"
+               [style.border-color]="isFlowSelected(flow.path) ? '#4a9eff' : '#2a3a5c'"
+               [style.background]="isFlowSelected(flow.path) ? '#1a2332' : '#0f1626'">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="font-size: 20px; color: #4a9eff;">
+                <i class="bi" [ngClass]="isFlowSelected(flow.path) ? 'bi-check-square-fill' : 'bi-square'"></i>
+              </div>
+              <div style="flex: 1;">
+                <div style="color: #4a9eff; font-weight: 600;">{{ flow.name }}</div>
+                <div style="color: #6c757d; font-size: 11px; font-family: monospace;">{{ flow.path }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="!loadingFlows && availableFlows.length === 0" style="text-align: center; padding: 40px; color: #6c757d;">
+          <p>No se encontraron flujos en el servidor SFTP.</p>
+        </div>
+
+        <div *ngIf="selectedFlowsForTemplate.size > 0" style="margin-top: 15px; padding: 10px; background: #17a2b8; border-radius: 6px; color: white;">
+          <strong>{{ selectedFlowsForTemplate.size }}</strong> flujo(s) seleccionado(s)
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" style="background: #6c757d; color: white;" (click)="resetModalState()">
+        Cancelar
+      </button>
+      <button *ngIf="!showFlowSelector" 
+              class="btn" 
+              style="background: #28a745; color: white;" 
+              (click)="createTemplateFromFlows()"
+              [disabled]="!selectedTemplateType">
+        {{ selectedTemplateType === 'CUSTOM' ? 'Siguiente' : 'Crear Plantilla' }}
+      </button>
+      <button *ngIf="showFlowSelector" 
+              class="btn" 
+              style="background: #17a2b8; color: white;" 
+              (click)="showFlowSelector = false; selectedPackageIdForFile = null;">
+        ← Volver
+      </button>
+      <button *ngIf="showFlowSelector" 
+              class="btn" 
+              style="background: #28a745; color: white;" 
+              (click)="createTemplateFromFlows()"
+              [disabled]="!customTemplateName || customTemplateName.trim() === '' || selectedFlowsForTemplate.size === 0">
+        Crear Plantilla
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Panel de Validación y Vista Previa -->
+<div class="validation-panel" [class.open]="showValidationPanel" *ngIf="showValidationPanel">
+  <div class="validation-panel-header">
+    <h5 class="mb-0">
+      <i class="bi bi-shield-check me-2"></i>
+      Validación y Vista Previa
+    </h5>
+    <button class="btn btn-sm btn-outline-light" (click)="toggleValidationPanel()">
+      <i class="bi bi-x"></i>
+    </button>
+  </div>
+  
+  <div class="validation-panel-body">
+    <!-- Resultado de validación -->
+    <div class="validation-section mb-3" *ngIf="validationResult">
+      <h6 [ngClass]="{
+        'text-danger': !validationResult.isValid,
+        'text-warning': validationResult.isValid && validationResult.warnings.length > 0,
+        'text-success': validationResult.isValid && validationResult.warnings.length === 0
+      }">
+        <i class="bi me-2" [ngClass]="{
+          'bi-x-circle': !validationResult.isValid,
+          'bi-exclamation-triangle': validationResult.isValid && validationResult.warnings.length > 0,
+          'bi-check-circle': validationResult.isValid && validationResult.warnings.length === 0
+        }"></i>
+        Validación de la Plantilla
+        <span class="badge ms-2" [ngClass]="{
+          'bg-danger': !validationResult.isValid,
+          'bg-warning': validationResult.isValid && validationResult.warnings.length > 0,
+          'bg-success': validationResult.isValid && validationResult.warnings.length === 0
+        }">
+          {{ validationResult.isValid ? 'Válida' : 'Inválida' }}
+        </span>
+      </h6>
+      
+      <!-- Errores -->
+      <div *ngIf="validationResult.errors.length > 0" class="alert alert-danger">
+        <strong>Errores ({{ validationResult.errors.length }}):</strong>
+        <ul class="mb-0 mt-2">
+          <li *ngFor="let error of validationResult.errors">
+            <span *ngIf="error.formId" class="badge bg-secondary me-1">{{ error.formId }}</span>
+            <span *ngIf="error.tcode" class="badge bg-info me-1">{{ error.tcode }}</span>
+            {{ error.message }}
+          </li>
+        </ul>
+      </div>
+      
+      <!-- Advertencias -->
+      <div *ngIf="validationResult.warnings.length > 0" class="alert alert-warning">
+        <strong>Advertencias ({{ validationResult.warnings.length }}):</strong>
+        <ul class="mb-0 mt-2">
+          <li *ngFor="let warning of validationResult.warnings.slice(0, 10)">
+            <span *ngIf="warning.formId" class="badge bg-secondary me-1">{{ warning.formId }}</span>
+            <span *ngIf="warning.tcode" class="badge bg-info me-1">{{ warning.tcode }}</span>
+            {{ warning.message }}
+          </li>
+          <li *ngIf="validationResult.warnings.length > 10" class="text-muted">
+            ... y {{ validationResult.warnings.length - 10 }} advertencia(s) más
+          </li>
+        </ul>
+      </div>
+      
+      <!-- Resumen -->
+      <div class="mt-2">
+        <small class="text-muted">
+          <strong>Resumen:</strong>
+          Formularios: {{ validationResult.summary.totalForms }},
+          Con errores: {{ validationResult.summary.formsWithErrors }},
+          Con advertencias: {{ validationResult.summary.formsWithWarnings }},
+          Referencias inválidas: {{ validationResult.summary.invalidFlowReferences }},
+          Nombres duplicados: {{ validationResult.summary.duplicateNames }}
+        </small>
+      </div>
+    </div>
+    
+    <!-- Vista previa con fechas -->
+    <div class="preview-section mb-3">
+      <h6 class="text-info">
+        <i class="bi bi-eye me-2"></i>
+        Vista Previa con Fechas
+        <button class="btn btn-sm btn-outline-light ms-2" (click)="previewTemplateWithTodayDate()">
+          <i class="bi bi-calendar"></i> Probar
+        </button>
+      </h6>
+      <div *ngIf="previewData" class="preview-container">
+        <pre class="preview-json">{{ getPreviewJsonString() }}</pre>
+      </div>
+      <div *ngIf="!previewData" class="text-muted text-center py-3">
+        Haz clic en "Probar" para ver una vista previa de cómo se verá la plantilla con fechas aplicadas
+      </div>
+    </div>
+    
+    <!-- Comparación de versiones -->
+    <div class="comparison-section mb-3" *ngIf="currentTemplateId && getTemplateHistory(currentTemplateId).length > 0">
+      <h6 class="text-warning">
+        <i class="bi bi-arrow-left-right me-2"></i>
+        Comparar Versiones
+      </h6>
+      <div class="history-list">
+        <div *ngFor="let version of getTemplateHistory(currentTemplateId).slice().reverse(); let i = index" 
+             class="history-item"
+             (click)="compareTemplateVersions(currentTemplateId!, getTemplateHistory(currentTemplateId).length - 1 - i)">
+          <div class="history-version">
+            Versión {{ getTemplateHistory(currentTemplateId).length - i }} ({{ version.forms?.length || 0 }} formularios)
+          </div>
+          <div class="history-date">
+            {{ getCurrentDateString() }}
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Resultado de comparación -->
+    <div class="comparison-result-section" *ngIf="comparisonResult">
+      <h6 class="text-secondary">
+        <i class="bi bi-list-check me-2"></i>
+        Diferencias Encontradas
+      </h6>
+      <div class="alert alert-info">
+        <ul class="mb-0">
+          <li *ngFor="let diff of comparisonResult.differences">{{ diff }}</li>
+        </ul>
+        <div *ngIf="comparisonResult.addedForms.length > 0" class="mt-2">
+          <strong>Formularios agregados:</strong> {{ comparisonResult.addedForms.join(', ') }}
+        </div>
+        <div *ngIf="comparisonResult.removedForms.length > 0" class="mt-2">
+          <strong>Formularios eliminados:</strong> {{ comparisonResult.removedForms.join(', ') }}
+        </div>
+        <div *ngIf="comparisonResult.modifiedForms.length > 0" class="mt-2">
+          <strong>Formularios modificados:</strong> {{ comparisonResult.modifiedForms.join(', ') }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
