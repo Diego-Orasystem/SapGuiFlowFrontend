@@ -44,7 +44,7 @@ export interface TargetControlsResponse {
   providedIn: 'root'
 })
 export class TargetsService {
-  private baseUrl = 'http://localhost:3000/api';
+  private baseUrl = 'http://10.8.0.31:3001/api';
   private availableTargetsSubject = new BehaviorSubject<SapTargetFile[]>([]);
   private currentTargetsSubject = new BehaviorSubject<TargetControlsResponse | null>(null);
 
