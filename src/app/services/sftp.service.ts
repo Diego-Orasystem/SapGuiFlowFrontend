@@ -41,7 +41,7 @@ export interface SavePackageToSftpResponse {
   providedIn: 'root'
 })
 export class SftpService {
-  private apiUrl = 'http://localhost:3000/api/sftp'; // Ajustar según la configuración del backend
+  private apiUrl = 'http://10.8.0.42:3004/api/sftp'; // Ajustar según la configuración del backend
 
   constructor(private http: HttpClient) { }
 
@@ -331,4 +331,3 @@ export class SftpService {
     return localStorage.getItem('apiKey') || null;
   }
 }
-
