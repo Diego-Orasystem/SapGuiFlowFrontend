@@ -62,7 +62,7 @@ export interface ScheduleExecutionResult {
   providedIn: 'root'
 })
 export class SchedulerService {
-  private apiUrl = 'http://10.8.0.42:3004/api/scheduler'; // Ajustar según la configuración del backend
+  private apiUrl = 'http://10.8.0.54:3001/api/scheduler'; // Ajustar según la configuración del backend
 
   constructor(
     private http: HttpClient,
