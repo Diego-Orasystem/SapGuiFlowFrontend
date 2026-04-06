@@ -1,105 +1,116 @@
-<div class="container-fluid py-3">
-  <div class="row">
-    <div class="col-12 col-lg-8">
-      <div class="card shadow-sm">
-        <div class="card-header bg-white">
-          <h5 class="mb-0">Nuevo modulo de consulta</h5>
+<div class="tcode-shell">
+  <section class="hero-card">
+    <div class="hero-text">
+      <p class="eyebrow">SAP Query Builder</p>
+      <h2>Generador anual de parametros .sqpr</h2>
+      <p class="hero-subtitle">
+        Se toma una plantilla base por TCode. Para MB51 se crea un archivo por cada ano seleccionado, con fechas
+        actualizadas en contenido y en nombre del archivo.
+      </p>
+    </div>
+    <div class="hero-badge">
+      <span>Modo activo</span>
+      <strong>MB51</strong>
+    </div>
+  </section>
+
+  <section class="workbench-card">
+    <form (ngSubmit)="generate()" class="query-form">
+      <div class="row g-3">
+        <div class="col-12 col-md-4">
+          <label for="tcode" class="form-label">TCode</label>
+          <select id="tcode" class="form-select" name="tcode" [(ngModel)]="selectedTcode">
+            <option *ngFor="let option of availableTcodes" [value]="option.value" [disabled]="!option.enabled">
+              {{ option.label }}
+            </option>
+          </select>
         </div>
-        <div class="card-body">
-          <form (ngSubmit)="submit()">
-            <div class="mb-3">
-              <label for="tcode" class="form-label">TCode</label>
-              <select id="tcode" class="form-select" name="tcode" [(ngModel)]="selectedTcode">
-                <option value="mb51">MB51</option>
-                <option value="me2l">ME2L</option>
-              </select>
-            </div>
 
-            <div class="form-check mb-3">
-              <input
-                id="useSpecificDateRange"
-                class="form-check-input"
-                type="checkbox"
-                name="useSpecificDateRange"
-                [(ngModel)]="useSpecificDateRange"
-                (change)="onDateModeChange()"
-              />
-              <label for="useSpecificDateRange" class="form-check-label">
-                Usar rango de fechas especifico (dia, mes y anio)
-              </label>
-            </div>
-
-            <div *ngIf="!useSpecificDateRange" class="row g-3 mb-3">
-              <div class="col-12 col-md-6">
-                <label for="fromYear" class="form-label">Desde anio</label>
-                <input
-                  id="fromYear"
-                  class="form-control"
-                  type="number"
-                  min="1900"
-                  max="2100"
-                  name="fromYear"
-                  [(ngModel)]="fromYear"
-                />
-              </div>
-              <div class="col-12 col-md-6">
-                <label for="toYear" class="form-label">Hasta anio</label>
-                <input
-                  id="toYear"
-                  class="form-control"
-                  type="number"
-                  min="1900"
-                  max="2100"
-                  name="toYear"
-                  [(ngModel)]="toYear"
-                />
-              </div>
-            </div>
-
-            <div *ngIf="useSpecificDateRange" class="row g-3 mb-3">
-              <div class="col-12 col-md-6">
-                <label for="fromDate" class="form-label">Fecha desde</label>
-                <input
-                  id="fromDate"
-                  class="form-control"
-                  type="date"
-                  name="fromDate"
-                  [(ngModel)]="fromDate"
-                />
-              </div>
-              <div class="col-12 col-md-6">
-                <label for="toDate" class="form-label">Fecha hasta</label>
-                <input
-                  id="toDate"
-                  class="form-control"
-                  type="date"
-                  name="toDate"
-                  [(ngModel)]="toDate"
-                />
-              </div>
-            </div>
-
-            <button type="submit" class="btn btn-primary">
-              Continuar
+        <div class="col-12 col-md-8">
+          <label class="form-label d-block">Rango</label>
+          <div class="range-toggle">
+            <button
+              type="button"
+              class="toggle-btn"
+              [class.active]="!useSpecificDateRange"
+              (click)="useSpecificDateRange = false; onDateModeChange()">
+              Por anos
             </button>
-          </form>
+            <button
+              type="button"
+              class="toggle-btn"
+              [class.active]="useSpecificDateRange"
+              (click)="useSpecificDateRange = true; onDateModeChange()">
+              Fechas especificas
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
 
-  <div *ngIf="submitted" class="row mt-3">
-    <div class="col-12 col-lg-8">
-      <div class="alert alert-success mb-0">
-        <strong>Formulario listo:</strong>
-        TCode: {{ selectedTcode | uppercase }}.
-        <span *ngIf="!useSpecificDateRange">
-          Rango por anio: {{ fromYear }} - {{ toYear }}.
-        </span>
-        <span *ngIf="useSpecificDateRange">
-          Rango especifico: {{ fromDate || 'sin fecha inicial' }} - {{ toDate || 'sin fecha final' }}.
-        </span>
+      <div *ngIf="!useSpecificDateRange" class="row g-3 mt-1">
+        <div class="col-12 col-md-6">
+          <label for="fromYear" class="form-label">Desde ano</label>
+          <input
+            id="fromYear"
+            class="form-control"
+            type="number"
+            min="1900"
+            max="2100"
+            name="fromYear"
+            [(ngModel)]="fromYear" />
+        </div>
+        <div class="col-12 col-md-6">
+          <label for="toYear" class="form-label">Hasta ano</label>
+          <input
+            id="toYear"
+            class="form-control"
+            type="number"
+            min="1900"
+            max="2100"
+            name="toYear"
+            [(ngModel)]="toYear" />
+        </div>
       </div>
+
+      <div *ngIf="useSpecificDateRange" class="row g-3 mt-1">
+        <div class="col-12 col-md-6">
+          <label for="fromDate" class="form-label">Fecha desde</label>
+          <input id="fromDate" class="form-control" type="date" name="fromDate" [(ngModel)]="fromDate" />
+        </div>
+        <div class="col-12 col-md-6">
+          <label for="toDate" class="form-label">Fecha hasta</label>
+          <input id="toDate" class="form-control" type="date" name="toDate" [(ngModel)]="toDate" />
+        </div>
+      </div>
+
+      <div class="actions mt-4">
+        <button type="submit" class="btn btn-generate">Generar archivos</button>
+      </div>
+
+      <div *ngIf="formError" class="alert alert-danger mt-3 mb-0">{{ formError }}</div>
+    </form>
+  </section>
+
+  <section *ngIf="generatedFiles.length" class="results-card mt-3">
+    <div class="results-header">
+      <div>
+        <p class="results-eyebrow">Resultado</p>
+        <h3>{{ totalYearsGenerated }} archivo(s) generado(s)</h3>
+      </div>
+      <button type="button" class="btn btn-download-all" (click)="downloadAllFiles()">Descargar todo</button>
     </div>
-  </div>
+
+    <div class="file-grid">
+      <article *ngFor="let file of generatedFiles" class="file-item">
+        <div class="file-meta">
+          <span class="pill">{{ file.year }}</span>
+          <small>{{ file.postingDateLow }} a {{ file.postingDateHigh }}</small>
+        </div>
+        <p class="file-name" [title]="file.fileName">{{ file.fileName }}</p>
+        <button type="button" class="btn btn-sm btn-outline-primary" (click)="downloadFile(file)">
+          Descargar .sqpr
+        </button>
+      </article>
+    </div>
+  </section>
 </div>
