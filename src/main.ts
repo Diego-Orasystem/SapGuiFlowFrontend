@@ -14,6 +14,7 @@ import { SyncPackagesComponent } from './app/components/sync-packages/sync-packa
 import { SyncTemplatesEditorComponent } from './app/components/sync-templates-editor/sync-templates-editor.component';
 import { SftpExplorerComponent } from './app/components/sftp-explorer/sftp-explorer.component';
 import { SchedulerComponent } from './app/components/scheduler/scheduler.component';
+import { TcodeQueryComponent } from './app/components/tcode-query/tcode-query.component';
 
 const routes: Routes = [
   { path: '', redirectTo: '/home', pathMatch: 'full' },
@@ -22,6 +23,7 @@ const routes: Routes = [
   { path: 'sync-templates-editor', component: SyncTemplatesEditorComponent },
   { path: 'sftp-explorer', component: SftpExplorerComponent },
   { path: 'scheduler', component: SchedulerComponent },
+  { path: 'tcode-query', component: TcodeQueryComponent },
   { path: '**', redirectTo: '/home' }
 ];
 
